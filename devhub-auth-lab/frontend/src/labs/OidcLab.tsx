@@ -135,6 +135,16 @@ export function OidcLab({ t }: { t: Translate }) {
       : <div className="flow-banner walkthrough">FLOW WALKTHROUGH — NO REAL LOGIN<small>{t('oidc.bannerSub')}{status && !status.configured ? ` ${t('oidc.missing', { vars: status.missing.join(', ') })} ${t('oidc.enableHint')}` : ''}</small></div>}
 
     <section className="panel">
+      <div className="panel-header"><div><span className="panel-kicker">{t('oidc.paramsKicker')}</span><h3>{t('oidc.paramsTitle')}</h3></div></div>
+      <div className="param-grid">{(['state', 'nonce', 'pkce', 'redirect', 'code'] as const).map((id) => (
+        <div key={id} className="param-card">
+          <strong>{t(`oidc.param.${id}.name` as Key)}</strong>
+          <p>{t(`oidc.param.${id}.why` as Key)}</p>
+        </div>
+      ))}</div>
+    </section>
+
+    <section className="panel">
       <div className="panel-header"><div><span className="panel-kicker">{t('oidc.seqKicker')}</span><h3>Authorization Code Flow + PKCE</h3></div><div className="button-row"><button className="button secondary" disabled={current === 0} onClick={() => setCurrent(current - 1)}>← {t('oidc.prev')}</button><button className="button primary" disabled={current === STEPS.length - 1} onClick={() => setCurrent(current + 1)}>{t('oidc.next')} →</button></div></div>
       <div className="seq">
         <div className="seq-row seq-actors">{ACTORS.map((actor) => <div key={actor} className="seq-actor">{t(`oidc.actor.${actor}` as Key)}</div>)}</div>

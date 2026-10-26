@@ -41,13 +41,14 @@ export function LabHeading({ eyebrow, title, accent, lead, symbol, tone }: { eye
 
 export type ScriptStep = { id: string; label: string; endpoint: string; expected: number | string; run: () => Promise<ApiResult | void>; disabled?: boolean };
 
-// A numbered demo script: each row shows the expected status next to the one the backend actually returned.
-export function ScriptTable({ steps, results, t, onRun, busy }: {
+// A numbered demo script: each row can show the expected status next to the one the backend actually returned.
+export function ScriptTable({ steps, results, t, onRun, busy, showExpected = true }: {
   steps: ScriptStep[];
   results: Record<string, ApiResult | undefined>;
   t: Translate;
   onRun: (step: ScriptStep) => void;
   busy?: boolean;
+  showExpected?: boolean;
 }) {
   return <ol className="script-table">{steps.map((step, index) => {
     const result = results[step.id];
@@ -55,7 +56,7 @@ export function ScriptTable({ steps, results, t, onRun, busy }: {
     return <li key={step.id} className={`script-row ${result ? (matched ? 'matched' : 'mismatch') : ''}`}>
       <span className="script-index">{String(index + 1).padStart(2, '0')}</span>
       <div className="script-copy"><strong>{step.label}</strong><code>{step.endpoint}</code></div>
-      <span className="script-expected">{t('script.expected')} <b>{step.expected}</b></span>
+      {showExpected && <span className="script-expected">{t('script.expected')} <b>{step.expected}</b></span>}
       <StatusCode status={result?.status} />
       <button className="button secondary" disabled={busy || step.disabled} onClick={() => onRun(step)}>{result ? t('script.again') : t('script.run')} <span>→</span></button>
     </li>;

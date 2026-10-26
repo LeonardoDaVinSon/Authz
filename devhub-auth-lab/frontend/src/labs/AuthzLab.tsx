@@ -56,9 +56,8 @@ export function AuthzLab({ t }: { t: Translate }) {
     <LabHeading eyebrow={t('authz.eyebrow')} title="401" accent={t('authz.titleAccent')} lead={t('authz.lead')} symbol="⊘" tone="purple" />
     <div className="two-column authz-grid">
       <section className="panel">
-        <div className="panel-header"><div><span className="panel-kicker">{t('authz.scriptKicker')}</span><h3>{t('authz.scriptTitle')}</h3></div><span className="mini-badge">{t('authz.badge')}</span></div>
-        <p className="panel-description">{t('authz.scriptDesc')}</p>
-        <ScriptTable steps={steps} results={results} t={t} onRun={run} busy={busy} />
+        <div className="panel-header"><div><span className="panel-kicker">{t('authz.scriptKicker')}</span><h3>{t('authz.scriptTitle')}</h3></div></div>
+        <ScriptTable steps={steps} results={results} t={t} onRun={run} busy={busy} showExpected={false} />
         {anonLoggedIn && <p className="hint warn-text">{t('authz.alreadyLoggedIn')}</p>}
       </section>
       <section className="panel">

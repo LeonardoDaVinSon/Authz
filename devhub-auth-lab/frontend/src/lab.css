@@ -198,6 +198,39 @@ a.module-card .mono { font-size: 9px; letter-spacing: 0; text-transform: none; }
 .event-log code { font: 10px 'DM Mono', monospace; color: var(--muted); }
 .event-log .status-code { font-size: 13px; text-align: center; }
 
+/* OIDC param legend */
+.param-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+.param-card {
+  border: 1px solid #2a3651;
+  border-radius: 10px;
+  padding: 12px 12px 14px;
+  background: #0b1220;
+  min-height: 100%;
+}
+.param-card strong {
+  display: block;
+  font: 600 12px 'DM Mono', monospace;
+  color: var(--purple, #b5a5ff);
+  margin-bottom: 6px;
+}
+.param-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #c8d1e4;
+}
+@media (max-width: 1300px) {
+  .param-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .param-grid { grid-template-columns: 1fr; }
+}
+
 /* OIDC sequence diagram */
 .seq { display: flex; flex-direction: column; }
 .seq-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: relative; }

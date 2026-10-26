@@ -488,16 +488,28 @@ const DIAGRAMS = {
   },
 
   pkceFlow(slide, r) {
-    sequence(slide, r, ['Browser', 'DevHub client', 'Identity Provider'], [
-      { from: 1, self: true, wide: true, text: 'sinh verifier, challenge, state, nonce' },
-      { from: 0, to: 2, text: 'GET /authorize?code_challenge&state&nonce' },
-      { from: 2, self: true, text: 'user xác thực' },
-      { from: 2, to: 0, text: '302 redirect_uri?code&state', reply: true },
-      { from: 0, to: 1, text: 'callback → so state' },
-      { from: 1, to: 2, text: 'POST /token: code + verifier' },
+    sequence(slide, { x: r.x, y: r.y, w: r.w, h: 2.55 }, ['Browser', 'DevHub', 'IdP'], [
+      { from: 1, self: true, wide: true, text: 'sinh verifier · challenge · state · nonce' },
+      { from: 0, to: 2, text: '/authorize?challenge&state&nonce' },
+      { from: 2, to: 0, text: 'callback?code&state', reply: true },
+      { from: 1, to: 2, text: '/token: code + verifier' },
       { from: 2, to: 1, text: 'ID token + access token', reply: true },
-      { from: 1, self: true, wide: true, text: 'validate sig, iss, aud, exp, nonce' },
-    ], { size: 10 });
+    ], { size: 9.5 });
+
+    text(slide, 'TỪNG PARAM DÙNG ĐỂ LÀM GÌ', r.x, r.y + 2.65, r.w, 0.25, { size: 10, color: C.muted, bold: true });
+    const params = [
+      ['state', 'Khớp callback với lần bấm login này.\nChống CSRF trên redirect.', C.purple],
+      ['nonce', 'Phải có trong ID token.\nChống replay ID token.', C.blue],
+      ['PKCE', 'challenge lên URL; verifier giữ bí mật.\nCode bị cắp cũng đổi token không được.', C.green],
+      ['redirect_uri', 'Chỉ nhận callback đúng URL\nđã đăng ký với IdP.', C.orange],
+    ];
+    const pw = (r.w - 0.3) / 4;
+    params.forEach(([title, body, color], index) => {
+      box(slide, [
+        { text: `${title}\n`, options: { bold: true, color, fontSize: 12 } },
+        { text: body, options: { color: C.text, fontSize: 10 } },
+      ], r.x + index * (pw + 0.1), r.y + 2.95, pw, 1.4, { align: 'left', line: color });
+    });
   },
 
   oidcLogin(slide, r) {

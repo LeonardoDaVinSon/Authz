@@ -476,26 +476,35 @@
 
 **Nội dung hiển thị**
 
-- `state`: gắn callback với đúng lần bấm login này.
-- `nonce`: gắn ID token với đúng lần login OIDC.
-- PKCE (`code_verifier` / `challenge`): code bị đánh cắp cũng vô dụng.
-- Redirect URI và token phải khớp cấu hình đã đăng ký.
+- `state` — chống CSRF callback: “đây có đúng lần login tôi vừa bấm?”
+- `nonce` — gắn ID token với lần login này, chống replay token.
+- `code_verifier` / `code_challenge` (PKCE) — code bị đánh cắp cũng đổi token không được.
+- `redirect_uri` — chỉ nhận callback đúng URL đã đăng ký với IdP.
 
 **Speaker notes**
 
-> Lời dẫn: "Đây là flow OIDC phổ biến cho web/mobile. Không nên tự thiết kế lại nếu có thư viện maintained — hiểu flow và verify đúng là đủ."
+> Lời dẫn: giải thích từng param khi xuất hiện trên sơ đồ — đừng đọc như danh sách thuật ngữ.
 >
-> IdP ở đây = Identity Provider: nơi user thực sự gõ mật khẩu / MFA. DevHub chỉ nhận kết quả sau callback.
+> state: chuỗi ngẫu nhiên DevHub lưu trước khi redirect. Callback phải mang đúng state → chống kẻ khác “ghim” một login CSRF vào session của bạn.
 >
-> Các bước:
-> 1. Client sinh code_verifier ngẫu nhiên, code_challenge = BASE64URL(SHA256(verifier)), state, nonce; lưu phía server.
-> 2. Redirect browser tới /authorize với client_id, redirect_uri, scope=openid..., state, nonce, code_challenge, method=S256.
-> 3. Người dùng xác thực tại IdP.
-> 4. IdP redirect về redirect_uri với code + state. Client so state với giá trị đã lưu.
-> 5. Client đổi code + code_verifier lấy token ở /token. IdP kiểm tra SHA256(verifier) == challenge.
-> 6. Validate ID token: chữ ký (JWKS), iss, aud = client_id, exp, nonce.
+> nonce: chuỗi ngẫu nhiên gửi lên /authorize và phải có trong ID token. Không khớp → ID token không thuộc lần login này (chống replay).
 >
-> PKCE chặn việc dùng code bị đánh cắp; state chặn CSRF trên callback; nonce chặn replay ID token.
+> PKCE:
+> - code_verifier: bí mật ngẫu nhiên, chỉ DevHub giữ, không đưa lên URL.
+> - code_challenge = BASE64URL(SHA256(verifier)), gửi lên /authorize.
+> - Khi đổi code lấy token, gửi lại verifier; IdP kiểm tra hash khớp challenge. Ai chỉ cầm code (không có verifier) thì vô dụng.
+>
+> redirect_uri: phải khớp chính xác URL đã đăng ký ở IdP — tránh code bị đẩy sang domain lạ.
+>
+> client_id / scope=openid: IdP biết app nào đang xin login; openid báo đây là OIDC (cần ID token).
+>
+> Các bước (đi sơ đồ):
+> 1. Sinh verifier, challenge, state, nonce — lưu phía server.
+> 2. Redirect /authorize kèm challenge, state, nonce (không gửi verifier).
+> 3. User xác thực tại IdP.
+> 4. Callback: code + state → so state.
+> 5. POST /token: code + verifier → IdP kiểm PKCE → ID token + access token.
+> 6. Validate ID token: chữ ký, iss, aud, exp, nonce → tạo session DevHub.
 
 ## Slide 20 — OIDC Demo — Login qua Identity Provider
 
