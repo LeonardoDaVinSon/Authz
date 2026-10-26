@@ -1,0 +1,15 @@
+{
+  "name": "break-the-login-slides",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generates the Break the Login deck (PPTX) and docs/02-slide-content.md from deck-content.mjs",
+  "type": "module",
+  "scripts": {
+    "build": "node build-deck.mjs",
+    "verify": "node verify-deck.mjs"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2",
+    "pptxgenjs": "^3.12.0"
+  }
+}
