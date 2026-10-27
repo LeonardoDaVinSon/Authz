@@ -1,7 +1,8 @@
-import { Controller, Get, HttpCode, NotFoundException, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Controller, Get, HttpCode, NotFoundException, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from '../session/session.config';
 import { OidcSettings, oidcSettings } from './oidc-settings';
+import { resolveExtraScopes } from './oidc-scopes';
 import { classifyCallbackError, errorDetail, OIDC_TRANSACTION_TTL_MS, OidcFailure, OidcService } from './oidc.service';
 
 function requireSettings(): OidcSettings {
@@ -29,11 +30,12 @@ export class OidcController {
   }
 
   @Get('login')
-  async login(@Req() req: Request, @Res() res: Response) {
+  async login(@Req() req: Request, @Res() res: Response, @Query('extra') extra?: string) {
     const settings = requireSettings();
+    const extras = resolveExtraScopes(extra, settings.issuer);
     let started;
     try {
-      started = await this.oidc.startLogin(settings);
+      started = await this.oidc.startLogin(settings, extras);
     } catch {
       return res.redirect(returnUrl(settings, 'discovery_failed'));
     }
@@ -78,6 +80,7 @@ export class OidcController {
       req.session.role = result.user.role;
       req.session.oidcUser = result.user;
       req.session.oidcLogin = result.summary;
+      req.session.oidcAccessToken = result.access;
       req.session.save((saveError) => res.redirect(returnUrl(settings, saveError ? 'session_failed' : undefined)));
     });
   }
@@ -89,7 +92,21 @@ export class OidcController {
     return login;
   }
 
-  // Ends the DevHub session. The IdP session survives unless the browser also visits endSessionUrl.
+  // Teaching instrument: use the IdP access token against a real resource API (Google Drive).
+  @Get('resource/drive')
+  async driveResource(@Req() req: Request) {
+    const login = req.session.oidcLogin;
+    const access = req.session.oidcAccessToken;
+    if (!login || !access || req.session.userId !== login.user.id) {
+      throw new UnauthorizedException('No OIDC access token in this session — sign in again');
+    }
+    if (!login.accessToken.extraScopeIds.some((id) => id.startsWith('drive.'))) {
+      throw new BadRequestException('Sign in again with a Drive scope checked to call this resource');
+    }
+    return this.oidc.callDriveResource(access);
+  }
+
+  // Ends the DevHub session (and the retained Google access token). The IdP session survives unless the browser also visits endSessionUrl.
   @Post('logout')
   @HttpCode(200)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {

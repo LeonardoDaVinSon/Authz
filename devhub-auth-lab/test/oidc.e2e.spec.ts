@@ -83,6 +83,22 @@ describe('Demo 7 — live OIDC Authorization Code + PKCE', () => {
     expect(authorize.searchParams.has('code_verifier')).toBe(false);
   });
 
+  it('ignores unknown extra scopes and does not expose Drive extras for a non-Google issuer', async () => {
+    const status = await request(app.getHttpServer()).get('/oidc/status').expect(200);
+    expect(status.body.extraScopes).toEqual([]);
+
+    const start = await request.agent(app.getHttpServer()).get('/oidc/login?extra=drive.readonly,not-a-scope').expect(302);
+    const authorize = new URL(start.headers.location);
+    expect(authorize.searchParams.get('scope')).toBe('openid profile email');
+    expect(authorize.searchParams.get('prompt')).toBeNull();
+  });
+
+  it('rejects the Drive resource call without a Drive-scoped login', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await login(agent);
+    await agent.get('/oidc/resource/drive').expect(400);
+  });
+
   it('a valid login creates a DevHub session: /api/me 200, /api/admin 403 for a member', async () => {
     const agent = request.agent(app.getHttpServer());
     const { result } = await login(agent);
@@ -94,10 +110,28 @@ describe('Demo 7 — live OIDC Authorization Code + PKCE', () => {
     await agent.get('/api/admin').expect(403);
 
     const summary = await agent.get('/oidc/session').expect(200);
-    expect(summary.body.checks.map((check: { id: string }) => check.id)).toEqual(['state', 'pkce', 'signature', 'iss', 'aud', 'exp', 'nonce']);
+    expect(summary.body.checks.map((check: { id: string }) => check.id)).toEqual([
+      'state', 'nonce', 'pkce', 'redirect_uri', 'signature', 'iss', 'aud', 'iat', 'exp', 'email_verified',
+    ]);
+    expect(summary.body.params).toMatchObject({
+      state: expect.any(String),
+      nonce: expect.any(String),
+      codeChallenge: expect.stringMatching(/^[\w-]{43}$/),
+      codeVerifierPreview: expect.stringMatching(/… \(\d+ chars\)$/),
+      redirectUri: 'http://localhost:3000/oidc/callback',
+      emailVerified: true,
+    });
+    expect(summary.body.checks.find((check: { id: string }) => check.id === 'state').value).toBe(summary.body.params.state);
+    expect(summary.body.checks.find((check: { id: string }) => check.id === 'nonce').value).toBe(summary.body.params.nonce);
     expect(summary.body.idToken).toMatchObject({ alg: 'RS256', kid: 'test-key', claims: { iss: idp.issuer, aud: CLIENT_ID, sub: 'idp-user-42' } });
     expect(summary.body.accessToken.preview).toMatch(/… \(\d+ chars\)$/);
+    expect(summary.body.accessToken).toMatchObject({
+      requestedScope: 'openid profile email',
+      extraScopeIds: [],
+      retainedForResourceCall: true,
+    });
     expect(summary.body).not.toHaveProperty('idToken.raw');
+    expect(JSON.stringify(summary.body)).not.toMatch(/access_token|oidcAccessToken/);
   });
 
   it('rotates the session ID at the callback', async () => {

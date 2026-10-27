@@ -1,6 +1,6 @@
 import 'express-session';
 import type { DemoUser } from '../common/demo-users';
-import type { OidcLoginSummary, OidcTransaction } from '../oidc/oidc.service';
+import type { OidcLoginSummary, OidcStoredAccessToken, OidcTransaction } from '../oidc/oidc.service';
 
 declare module 'express-session' {
   interface SessionData {
@@ -11,5 +11,7 @@ declare module 'express-session' {
     oidcTransaction?: OidcTransaction;
     oidcUser?: DemoUser;
     oidcLogin?: OidcLoginSummary;
+    // Lab only: Google access token for /oidc/resource/drive. Never sent to the browser.
+    oidcAccessToken?: OidcStoredAccessToken;
   }
 }

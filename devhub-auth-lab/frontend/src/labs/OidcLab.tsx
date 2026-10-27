@@ -36,16 +36,35 @@ async function createPkce(): Promise<Pkce> {
   return { verifier, challenge: encodeBase64Url(digest), state: randomString(16), nonce: randomString(16) };
 }
 
+type OidcExtraScope = { id: string; scope: string; resource: string; googleOnly: boolean };
 type OidcStatus =
   | { mode: 'walkthrough'; configured: false; missing: string[] }
-  | { mode: 'live'; configured: true; issuer: string; clientId: string; clientType: string; redirectUri: string; scope: string; discovery: { ok: boolean }; banner: string };
+  | { mode: 'live'; configured: true; issuer: string; clientId: string; clientType: string; redirectUri: string; scope: string; extraScopes?: OidcExtraScope[]; discovery: { ok: boolean }; banner: string };
 
+type OidcCheckId = 'state' | 'nonce' | 'pkce' | 'redirect_uri' | 'signature' | 'iss' | 'aud' | 'iat' | 'exp' | 'email_verified';
 type OidcLogin = {
+  completedAt: string;
   user: { name: string; email: string; role: string };
   idToken: { alg: string; kid: string | null; claims: Record<string, unknown> };
-  accessToken: Record<string, unknown>;
+  accessToken: {
+    tokenType: string;
+    expiresIn: number | null;
+    scope: string | null;
+    requestedScope: string;
+    extraScopeIds: string[];
+    preview: string;
+    retainedForResourceCall: boolean;
+  };
   refreshTokenIssued: boolean;
-  checks: { id: 'state' | 'pkce' | 'signature' | 'iss' | 'aud' | 'exp' | 'nonce'; detail: string; value?: string }[];
+  params: {
+    state: string;
+    nonce: string;
+    codeChallenge: string;
+    codeVerifierPreview: string;
+    redirectUri: string;
+    emailVerified: boolean | null;
+  };
+  checks: { id: OidcCheckId; detail: string; value?: string }[];
 };
 
 // The callback redirects back here with ?oidc=ok or ?oidc=error&reason=…
@@ -65,19 +84,35 @@ function LiveOidc({ t, status }: { t: Translate; status: Extract<OidcStatus, { m
   const [callback] = useState(readCallbackResult);
   const [login, setLogin] = useState<OidcLogin | null>(null);
   const [me, setMe] = useState<ApiResult | null>(null);
+  const [drive, setDrive] = useState<ApiResult | null>(null);
   const [endSessionUrl, setEndSessionUrl] = useState<string | null>(null);
   const [loggedOut, setLoggedOut] = useState(false);
+  const [extraIds, setExtraIds] = useState<string[]>([]);
+  const extras = status.extraScopes ?? [];
 
   useEffect(() => {
     if (window.location.search) window.history.replaceState(null, '', window.location.pathname);
     request('/oidc/session').then((result) => setLogin(result.ok ? result.body : null));
   }, []);
 
+  const toggleExtra = (id: string) => {
+    setExtraIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  };
+
+  const signIn = () => {
+    const url = new URL(`${API}/oidc/login`);
+    if (extraIds.length) url.searchParams.set('extra', extraIds.join(','));
+    window.location.href = url.href;
+  };
+
   const logout = async () => {
     const result = await postJson('/oidc/logout');
     setEndSessionUrl(result.ok ? result.body.endSessionUrl : null);
-    setLogin(null); setMe(null); setLoggedOut(true);
+    setLogin(null); setMe(null); setDrive(null); setLoggedOut(true);
   };
+
+  const requestedScope = [status.scope, ...extras.filter((item) => extraIds.includes(item.id)).map((item) => item.scope)].join(' ');
+  const hasDriveLogin = Boolean(login?.accessToken.extraScopeIds.some((id) => id.startsWith('drive.')));
 
   return <>
     <div className={`flow-banner ${status.discovery.ok ? 'real' : 'walkthrough'}`}>{status.banner}<small>{status.discovery.ok ? t('oidc.liveSub', { issuer: status.issuer }) : t('oidc.unreachableSub', { issuer: status.issuer })}</small></div>
@@ -88,10 +123,28 @@ function LiveOidc({ t, status }: { t: Translate; status: Extract<OidcStatus, { m
           <dt>issuer</dt><dd>{status.issuer}</dd>
           <dt>client_id</dt><dd>{status.clientId} · {status.clientType}</dd>
           <dt>redirect_uri</dt><dd>{status.redirectUri}</dd>
-          <dt>scope</dt><dd>{status.scope}</dd>
+          <dt>scope</dt><dd>{requestedScope}</dd>
         </dl>
+        {extras.length > 0 && (
+          <div className="oidc-scope-picker">
+            <div className="panel-kicker">{t('oidc.scopePickerKicker')}</div>
+            <p className="hint">{t('oidc.scopePickerHint')}</p>
+            <label className="check-row oidc-scope-locked"><input type="checkbox" checked disabled /> <span><strong>openid profile email</strong><small>{t('oidc.scopeIdentity')}</small></span></label>
+            {extras.map((item) => (
+              <label key={item.id} className="check-row">
+                <input type="checkbox" checked={extraIds.includes(item.id)} onChange={() => toggleExtra(item.id)} />
+                <span>
+                  <strong>{t(`oidc.extra.${item.id}.label` as Key)}</strong>
+                  <small>{item.scope}</small>
+                  <small className="oidc-scope-resource">{t('oidc.scopeResource', { resource: item.resource })}</small>
+                </span>
+              </label>
+            ))}
+            <p className="hint">{t('oidc.scopeDriveSetup')}</p>
+          </div>
+        )}
         <p className="hint">{t('oidc.registerHint')}</p>
-        <button className="button primary full" disabled={!status.discovery.ok} onClick={() => { window.location.href = `${API}/oidc/login`; }}>{t('oidc.signIn')} <span>↗</span></button>
+        <button className="button primary full" disabled={!status.discovery.ok} onClick={signIn}>{t('oidc.signIn')} <span>↗</span></button>
         {callback && (callback.ok
           ? <div className="verdict good">{t('oidc.resultOk')}</div>
           : <div className="verdict bad">{t('oidc.resultError', { reason: t(`oidc.reason.${callback.reason}` as Key, { detail: callback.detail || '—' }) })}<span className="verdict-code">reason = {callback.reason}</span></div>)}
@@ -100,16 +153,46 @@ function LiveOidc({ t, status }: { t: Translate; status: Extract<OidcStatus, { m
       <section className="panel">
         <div className="panel-header"><div><span className="panel-kicker">{t('oidc.validatedKicker')}</span><h3>{login ? t('oidc.signedInAs', { name: login.user.name, role: login.user.role }) : t('oidc.noLogin')}</h3></div>{login && <span className="mini-badge">{login.user.email}</span>}</div>
         {login && <>
-          <ul className="oidc-checks">{login.checks.map((check) => <li key={check.id}><span className="pill good">✓ {check.id}</span><small>{t(`oidc.check.${check.id}`, { value: check.value ?? '' })}</small></li>)}</ul>
-          <div className="button-row"><button className="button secondary" onClick={async () => setMe(await request('/api/me'))}>{t('oidc.callMe')}</button><button className="button danger" onClick={logout}>{t('oidc.logoutLocal')}</button></div>
-          {me && <div className="result-block"><div className="result-title"><span>GET /api/me</span><Status result={me} t={t} /></div><JsonPanel value={me.body} /></div>}
+          <ul className="oidc-checks">{login.checks.map((check) => (
+            <li key={check.id}>
+              <span className="pill good">✓ {check.id}</span>
+              <div className="oidc-check-body">
+                <small>{t(`oidc.check.${check.id}` as Key, { value: check.value ?? '' })}</small>
+                {check.value && <code className="oidc-check-value">{check.value}</code>}
+              </div>
+            </li>
+          ))}</ul>
+          <div className="button-row">
+            <button className="button secondary" onClick={async () => setMe(await request('/api/me'))}>{t('oidc.callMe')}</button>
+            <button className="button secondary" disabled={!hasDriveLogin} onClick={async () => setDrive(await request('/oidc/resource/drive'))}>{t('oidc.callDrive')}</button>
+            <button className="button danger" onClick={logout}>{t('oidc.logoutLocal')}</button>
+          </div>
+          <p className="hint">{hasDriveLogin ? t('oidc.resourceHint') : t('oidc.resourceHintLocked')}</p>
+          {me && <div className="result-block"><div className="result-title"><span>GET /api/me · {t('oidc.viaSession')}</span><Status result={me} t={t} /></div><JsonPanel value={me.body} /></div>}
+          {drive && <div className="result-block"><div className="result-title"><span>GET /oidc/resource/drive · {t('oidc.viaAccessToken')}</span><Status result={drive} t={t} /></div><JsonPanel value={drive.body} /></div>}
         </>}
       </section>
     </div>
-    {login && <div className="two-column">
-      <section className="panel"><div className="panel-header"><div><span className="panel-kicker">ID TOKEN · {login.idToken.alg}</span><h3>{t('oidc.idTokenTitle')}</h3></div><span className="mini-badge" title={login.idToken.kid ?? undefined}>kid = {shortKid(login.idToken.kid)}</span></div><JsonPanel value={login.idToken.claims} /></section>
-      <section className="panel"><div className="panel-header"><div><span className="panel-kicker">ACCESS TOKEN</span><h3>{t('oidc.accessTitle')}</h3></div></div><JsonPanel value={{ ...login.accessToken, refreshTokenIssued: login.refreshTokenIssued }} /></section>
-    </div>}
+    {login && <>
+      <section className="panel">
+        <div className="panel-header"><div><span className="panel-kicker">{t('oidc.paramsLiveKicker')}</span><h3>{t('oidc.paramsLiveTitle')}</h3></div><span className="mini-badge">{new Date(login.completedAt).toLocaleString()}</span></div>
+        <dl className="oidc-config">
+          <dt>state</dt><dd>{login.params.state}</dd>
+          <dt>nonce</dt><dd>{login.params.nonce}</dd>
+          <dt>code_challenge</dt><dd>{login.params.codeChallenge}</dd>
+          <dt>code_verifier</dt><dd>{login.params.codeVerifierPreview}</dd>
+          <dt>redirect_uri</dt><dd>{login.params.redirectUri}</dd>
+          <dt>requested_scope</dt><dd>{login.accessToken.requestedScope}</dd>
+          <dt>granted_scope</dt><dd>{login.accessToken.scope ?? '—'}</dd>
+          <dt>email_verified</dt><dd>{login.params.emailVerified === null ? '—' : String(login.params.emailVerified)}</dd>
+        </dl>
+        <p className="hint">{t('oidc.paramsLiveHint')}</p>
+      </section>
+      <div className="two-column">
+        <section className="panel"><div className="panel-header"><div><span className="panel-kicker">ID TOKEN · {login.idToken.alg}</span><h3>{t('oidc.idTokenTitle')}</h3></div><span className="mini-badge" title={login.idToken.kid ?? undefined}>kid = {shortKid(login.idToken.kid)}</span></div><JsonPanel value={login.idToken.claims} /><p className="hint">{t('oidc.idLiveHint')}</p></section>
+        <section className="panel"><div className="panel-header"><div><span className="panel-kicker">ACCESS TOKEN</span><h3>{t('oidc.accessTitle')}</h3></div><span className="mini-badge">{login.accessToken.extraScopeIds.length ? 'resource scopes' : 'identity scopes'}</span></div><JsonPanel value={{ ...login.accessToken, refreshTokenIssued: login.refreshTokenIssued }} /><p className="hint">{t('oidc.accessLiveHint')}</p></section>
+      </div>
+    </>}
   </>;
 }
 
