@@ -6,6 +6,10 @@ export const DECK = {
   subtitle: 'Từ login đến credential lifecycle',
   audience: 'DevHub · Fullstack Technical Sharing',
   durationMinutes: 90,
+  series: {
+    session1: { label: 'Buổi 1 · Authentication', speaker: 'Đào Vĩnh Sơn' },
+    session2: { label: 'Buổi 2 · Authorization', speaker: 'Nguyễn Ngọc Nhiên' },
+  },
 };
 
 /** Demo routes served by the lab frontend (devhub-auth-lab/frontend/src/routes.ts). */
@@ -19,28 +23,50 @@ export const DEMO_LINKS = {
   oidc: { label: 'Mở OIDC Demo ↗', route: '/demo/oidc', demo: 7 },
 };
 
-export const SLIDES = [
+/** Main parts of the session. The agenda slide and every part intro slide read from here. */
+export const PARTS = [
+  { no: '01', title: 'AuthN ≠ AuthZ', detail: '401 / 403 · quyền phía server', color: 'purple' },
+  { no: '02', title: 'Password', detail: 'Hash · salt · stuffing', color: 'orange' },
+  { no: '03', title: 'Session & cookie', detail: 'Lifecycle · logout · CSRF/XSS', color: 'green' },
+  { no: '04', title: 'JWT & tokens', detail: 'Decode ≠ verify · refresh', color: 'blue' },
+  { no: '05', title: 'OAuth / OIDC', detail: 'Code Flow + PKCE · SAML', color: 'purple' },
+  { no: '06', title: 'Lựa chọn', detail: 'Threat model · checklist', color: 'orange' },
+];
+
+export const RECAP = [
+  { line: '`401` vs `403`. Quyền ở server.' },
+  { line: 'Hash, không encrypt.' },
+  { line: 'Cookie ≠ session.' },
+  { line: 'Decode ≠ verify.' },
+  { line: 'OAuth ≠ login.' },
+  { line: 'Chọn theo threat model.' },
+];
+
+const CONTENT = [
   {
-    n: 1, minutes: 1, time: '00–01', section: 'Mở đầu',
+    minutes: 1, section: 'Mở đầu',
     title: 'Break the Login',
-    bullets: ['Authentication Core', 'Từ login đến credential lifecycle', 'DevHub · Fullstack Technical Sharing'],
-    diagram: 'architecture',
-    notes: `Lời dẫn: "Hôm nay chúng ta không chỉ xem cách login thành công. Chúng ta sẽ theo dõi credential từ lúc được tạo, lưu trữ, gửi qua request, xác minh cho đến khi hết hạn hoặc bị thu hồi."
+    bullets: [
+      'Buổi 1 · Authentication — Đào Vĩnh Sơn',
+      'Buổi 2 · Authorization — Nguyễn Ngọc Nhiên',
+      'Hôm nay: credential lifecycle — tạo · lưu · gửi · verify · thu hồi',
+    ],
+    notes: `Lời dẫn: "Đây là buổi 1 trong series Auth của DevHub — Authentication, mình là Đào Vĩnh Sơn. Buổi 2 về Authorization sẽ do Nguyễn Ngọc Nhiên trình bày."
 
-Sơ đồ: Browser nói chuyện với DevHub API. Phía sau API có hai nơi giữ "sự thật" về danh tính: session store (khi dùng session) và Identity Provider (khi dùng SSO/OIDC). Cả buổi sẽ đi qua từng mũi tên trên sơ đồ này.
+Câu chính: "Hôm nay không chỉ xem login thành công — ta theo dõi credential từ lúc tạo, lưu, gửi, xác minh đến khi hết hạn hoặc bị thu hồi."
 
-Demo: chưa mở demo. Trước giờ trình bày đã mở sẵn http://localhost:5173/demo và bấm "Reset demo".`,
+Demo: chưa mở. Trước giờ đã mở http://localhost:5173/demo và bấm Reset demo.`,
   },
   {
-    n: 2, minutes: 2, time: '01–03', section: 'Mở đầu',
-    title: 'Hôm nay chúng ta đi qua những phần nào?',
+    minutes: 2, section: 'Mở đầu',
+    title: 'Nội dung chính',
     bullets: [
       'AuthN ≠ AuthZ · `401` / `403`',
       'Password hashing và salt',
       'Session, cookie, logout',
       'JWT · access / refresh token',
       'OAuth 2.0 · OIDC · SAML',
-      'Chọn kiến trúc · checklist',
+      'Lựa chọn · checklist',
     ],
     diagram: 'agenda',
     notes: `Lời dẫn: "Buổi này đi theo vòng đời credential, không phải liệt kê mọi giao thức. Sáu phần chính trên slide — mỗi phần có ít nhất một điểm cần nhớ và hầu hết có demo chạy thật trên lab."
@@ -51,52 +77,57 @@ Demo: chưa mở demo. Trước giờ trình bày đã mở sẵn http://localho
 3. Session — cookie là credential; logout phải huỷ phía server.
 4. JWT — decode ≠ verify; access ngắn hạn, refresh phải rotate.
 5. OAuth / OIDC / SAML — ủy quyền ≠ login; Code Flow + PKCE; SAML cùng SSO khác giao thức.
-6. Kiến trúc — chọn theo threat model, rồi checklist khi review PR.
+6. Lựa chọn — chọn theo threat model, rồi checklist khi review PR.
 
-Nhắc: có 7 demo gắn nút trên slide. Không cần nhớ hết chi tiết; cần biết lớp nào hỏng khi gặp ticket "bug login".`,
+Nhắc: có 7 demo gắn nút trên slide. Mỗi phần mở đầu bằng một slide giới thiệu ngắn. Không cần nhớ hết chi tiết; cần biết lớp nào hỏng khi gặp một bug login.`,
   },
   {
-    n: 3, minutes: 4, time: '03–07', section: 'Mở đầu',
-    title: 'Ba ticket, cùng nhãn "bug login"',
-    bullets: [
-      'Không phải ba lỗi cùng một chỗ.',
-      'Cùng triệu chứng "login hỏng" — khác lớp nguyên nhân.',
-      'Câu hỏi cho buổi này: hỏng ở AuthN, AuthZ hay validation?',
-    ],
-    diagram: 'incidents',
-    notes: `Dẫn dắt trước khi chỉ ba thẻ: "Giả sử backlog DevHub tuần này có ba ticket, cả ba đều được gắn nhãn bug login. Product muốn một hotfix. Trước khi sửa, ta phải hỏi: đây có thật là lỗi login không?"
+    part: 1, minutes: 0.5, section: 'AuthN & AuthZ',
+    title: 'AuthN ≠ AuthZ',
+    question: 'Server đã biết bạn là ai chưa — và bạn được làm gì?',
+    bullets: [],
+    notes: `Chuyển phần: "Phần 1 — trước khi nói tới password hay token, cần tách rõ hai câu hỏi server phải trả lời ở mỗi request: bạn là ai, và bạn được làm gì."
 
-Đọc từng ticket như báo cáo từ user / QA (không đưa đáp án ngay):
-1. "Tôi đã bấm Logout rồi mà API vẫn nhận request của tôi." — cookie biến mất trên browser, nhưng trạng thái phía server còn sống?
-2. "Tài khoản member vào được API chỉ dành cho admin." — đã biết người dùng là ai, nhưng quyền sai?
-3. "Mở JWT ra thấy role: admin, vậy là admin rồi." — đọc được payload có nghĩa token đáng tin?
-
-Câu hỏi tương tác (30 giây): mỗi ticket thuộc lớp nào — AuthN / lifecycle, AuthZ, hay token validation?
-
-Gợi ý đáp án (để dành cho các slide sau, chưa nói chi tiết ngay):
-1 → lifecycle / revocation (session logout, refresh revoke).
-2 → authorization phía server (slide AuthN≠AuthZ, Demo 1).
-3 → token validation: decode ≠ verify (slide JWT).
-
-Câu chốt: "Cả buổi sẽ trang bị cách phân lớp những ticket kiểu này, thay vì vá lung tung ở nút Login."`,
+Không giải thích chi tiết ở đây; đọc câu hỏi rồi sang slide tiếp theo. Demo 1 ở cuối phần này.`,
   },
-{
-    n: 4, minutes: 3, time: '07–10', section: 'AuthN & AuthZ',
+  {
+    minutes: 3, section: 'AuthN & AuthZ',
     title: 'Authentication ≠ Authorization',
-    bullets: ['AuthN — Who are you?', 'AuthZ — What can you do?', 'Login thành công không đồng nghĩa có mọi quyền.'],
+    bullets: [
+      'AuthN: xác định ai đang gọi, từ cookie, Bearer token hoặc password.',
+      'AuthZ: principal đó có được gọi endpoint này không.',
+      'Login thành công ≠ có mọi quyền. AuthZ chạy ở backend, mỗi request.',
+    ],
     diagram: 'authnAuthz',
-    notes: `Liên hệ ticket 02 trên slide trước: member gọi được API admin — đó là AuthZ, không phải "login sai".
+    notes: `Lời dẫn: "Authentication xác định danh tính. Authorization quyết định danh tính đó có được thực hiện hành động đang yêu cầu hay không. Hai bước này cần được kiểm soát độc lập."
 
-Lời dẫn: "Authentication xác định danh tính. Authorization quyết định danh tính đó có được thực hiện hành động đang yêu cầu hay không. Hai bước này cần được kiểm soát độc lập."
+Đi theo sơ đồ: AuthN đọc credential (session cookie, Bearer token) và tạo ra principal { id, role } → AuthZ so principal với policy của endpoint → qua cả hai thì handler mới chạy.
 
-Đi theo sơ đồ: request đi vào → bước AuthN kiểm tra credential (password, session cookie, bearer token) → nếu ổn ta có một principal (id, role) → bước AuthZ so principal với policy của hành động (ví dụ: chỉ admin được gọi /api/admin).
+Chỉ khối ví dụ: member gọi GET /api/admin — AuthN pass (biết là user 42, role member), AuthZ fail (endpoint cần admin). Đây là lỗi AuthZ, không phải "login sai". Status code cụ thể để slide sau.
 
 Nhấn mạnh: AuthZ phải chạy ở mọi request, ở backend, dựa trên dữ liệu server tin được (bản ghi user/role phía server), không phải dữ liệu client gửi lên.`,
   },
   {
-    n: 5, minutes: 4, time: '10–14', section: 'AuthN & AuthZ',
+    minutes: 4, section: 'AuthN & AuthZ',
     title: '401 hay 403?',
-    bullets: ['`401` — credential thiếu hoặc không hợp lệ.', '`403` — đã xác thực nhưng không đủ quyền trong ngữ cảnh hiện tại.', 'Backend phải enforce quyền.'],
+    bullets: [
+      'Không có cookie / token → `401`',
+      'Token hết hạn → `401`',
+      'Chữ ký token sai → `401`',
+      '`member` gọi `GET /api/admin` → `403`',
+      '`admin` gọi `GET /api/admin` → `200`',
+      '`401`: không biết bạn là ai. `403`: biết, nhưng không cho.',
+    ],
+    cases: {
+      rows: [
+        ['Không có cookie / token', '401'],
+        ['Token hết hạn', '401'],
+        ['Chữ ký token sai', '401'],
+        ['`member` gọi `GET /api/admin`', '403'],
+        ['`admin` gọi `GET /api/admin`', '200'],
+      ],
+      takeaway: '`401`: không biết bạn là ai.\n`403`: biết, nhưng không cho.',
+    },
     diagram: 'decision401403',
     demo: 'authz',
     notes: `Demo 1 — API Authorization (khoảng 3 phút). Mở nút "Mở API Demo ↗".
@@ -117,43 +148,122 @@ Lời kết: "Ẩn nút ở frontend không phải authorization. API phải t�
 Nếu demo lỗi: dùng sơ đồ quyết định trên slide và nói rõ là đang giải thích bằng sơ đồ.`,
   },
   {
-    n: 6, minutes: 3, time: '14–17', section: 'Password',
+    part: 2, minutes: 0.5, section: 'Password',
+    title: 'Password',
+    question: 'DB bị lộ thì password của user có lộ theo không?',
+    bullets: [],
+    notes: `Chuyển phần: "Phần 2 — credential đầu tiên ta phải giữ là password. Câu hỏi: nếu DB bị dump, attacker lấy được gì?"
+
+Gợi ý trước: hash tốt chỉ chặn crack offline, không chặn được thử login bằng password lộ từ site khác. Demo 2 ở cuối phần.`,
+  },
+  {
+    minutes: 1.5, section: 'Password',
     title: 'Password không phải dữ liệu để đọc lại',
-    bullets: ['Không lưu plaintext.', 'Hashing khác encryption.', 'Verify thay vì giải mã.', 'Dùng password hashing chuyên dụng (Argon2id, bcrypt, scrypt).'],
+    bullets: [
+      'Hashing: một chiều, không cần key, server không đọc lại được password.',
+      'Encryption: hai chiều, có key là giải mã được; lộ DB + key là lộ toàn bộ.',
+      'Server chỉ cần biết password đúng hay sai, nên dùng hash.',
+    ],
+    compare: {
+      header: ['', 'Hashing', 'Encryption'],
+      rows: [
+        ['Chiều', 'Một chiều', 'Hai chiều'],
+        ['Cần key', 'Không', 'Có'],
+        ['Server đọc lại được password', 'Không', 'Có'],
+        ['Khi lộ DB (+ key)', 'Phải crack từng hash', 'Đọc được toàn bộ'],
+        ['Dùng cho', 'Password, checksum, integrity', 'PII, API key bên thứ 3, TLS'],
+      ],
+      takeaway: 'Server chỉ cần biết password đúng hay sai, không cần đọc lại. Vì vậy: hash, không encrypt.',
+    },
+    diagram: 'hashVsEncrypt',
+    notes: `Lời dẫn: "Ứng dụng không cần lấy lại password gốc từ database. Nó chỉ cần xác minh password người dùng nhập có đúng hay không."
+
+Đọc bảng theo từng hàng: hashing một chiều, không có key; encryption hai chiều, server phải giữ key. Nếu server giải mã được password thì attacker lấy được DB + key cũng giải mã được toàn bộ. Với hash, attacker phải crack từng cái một.
+
+Hàng "Dùng cho": hash khi chỉ cần so khớp (password, checksum file, kiểm tra toàn vẹn); encrypt khi phải đọc lại giá trị gốc (PII, API key của dịch vụ bên thứ 3 mà app phải gửi đi, dữ liệu trên đường truyền với TLS).
+
+PII (Personally Identifiable Information) = thông tin định danh cá nhân: số CCCD/hộ chiếu, số điện thoại, địa chỉ, email, ngày sinh, số tài khoản/số thẻ. PII nằm ở cột Encryption vì app thường phải đọc lại giá trị gốc (hiển thị SĐT cho CSKH, gửi email cho user); hash thì không lấy lại được.
+
+Hỏi nhanh khán giả: "Có ai từng thấy hệ thống lưu password bằng AES không?" — đây là lỗi hay gặp khi nhầm hashing với encryption.`,
+  },
+  {
+    minutes: 2, section: 'Password',
+    title: 'Lưu và verify password bằng bcrypt',
+    bullets: [
+      'DB chỉ lưu chuỗi hash: thuật toán, cost, salt, hash.',
+      'Login: hash lại password vừa nhập rồi so sánh constant-time.',
+      'Dùng Argon2id, hoặc bcrypt cost ≥ 10.',
+      'bcrypt chỉ dùng 72 byte đầu của password.',
+    ],
     diagram: 'passwordHash',
-    notes: `Lời dẫn: "Ứng dụng không cần lấy lại password gốc từ database. Nó chỉ cần xác minh password người dùng nhập có khớp với hash được lưu hay không."
+    notes: `Chỉ chuỗi hash trên sơ đồ: $2a$ là thuật toán bcrypt, 10 là cost, 22 ký tự kế tiếp là salt, phần còn lại là hash. Chuỗi tự chứa đủ thông tin để verify, không cần lưu salt ở cột riêng.
 
-Hashing là một chiều; encryption là hai chiều (có key thì giải mã được). Nếu server giải mã được password thì attacker lấy được key cũng giải mã được.
+Luồng verify: thư viện đọc salt + cost từ chuỗi đã lưu, hash lại password vừa nhập và so sánh constant-time. Không có bước giải mã nào.
 
-Lưu trữ: chuỗi hash bcrypt tự chứa thuật toán, cost và salt (ví dụ $2a$10$<salt 22 ký tự><hash>). Khi verify, thư viện đọc salt + cost từ chuỗi đã lưu, hash lại password vừa nhập và so sánh constant-time.
+Khuyến nghị: Argon2id là lựa chọn mặc định; bcrypt vẫn ổn với cost ≥ 10. Bẫy của bcrypt: chỉ dùng 72 byte đầu, phần sau bị bỏ qua — cần chặn độ dài hoặc pre-hash có chủ đích.
 
 Không dùng MD5/SHA-1/SHA-256 "trần" cho password: chúng được thiết kế để nhanh, mà nhanh là điều attacker muốn.`,
   },
   {
-    n: 7, minutes: 4, time: '17–24', section: 'Password',
+    minutes: 4, section: 'Password',
     title: 'Salt, brute-force và credential stuffing',
-    bullets: ['Salt ngẫu nhiên cho mỗi hash — không phải secret.', 'Hash chậm làm tăng chi phí đoán offline.', 'Rate limit, monitoring và MFA bổ sung cho hashing.'],
-    diagram: 'saltDefense',
+    bullets: [
+      'Tốc độ đoán trên 1 GPU: SHA-256 ~22 tỷ lần/giây, bcrypt cost 10 ~5 nghìn lần/giây.',
+      'Offline (DB bị lộ): salt + hash chậm có giúp.',
+      'Online (credential stuffing): hash không giúp; cần rate limit, MFA, chặn password đã lộ.',
+    ],
+    speed: {
+      caption: 'TỐC ĐỘ ĐOÁN TRÊN 1 GPU (RTX 4090)',
+      rows: [
+        ['SHA-256', '~22 tỷ lần/giây', 1, 'orange'],
+        ['bcrypt cost 10', '~5 nghìn lần/giây', 0, 'green'],
+      ],
+      ratio: 'bcrypt chậm hơn khoảng 4 triệu lần',
+      takeaway: 'Chậm là tính năng, không phải bug.',
+      source: 'Ước lượng từ benchmark hashcat công khai; bcrypt quy đổi từ cost 5.',
+    },
+    diagram: 'attackModes',
     demo: 'password',
     notes: `Demo 2 — Password Hashing (khoảng 3 phút). Mở nút "Mở Password Demo ↗".
 
 Kịch bản:
-1. Bấm "Hash password" rồi "Hash lại lần nữa" với cùng một password → hai chuỗi khác nhau; phần salt được tô màu.
-2. So sánh hai hash: khác nhau vì salt khác nhau.
-3. "Verify password đúng" → match: true.
-4. "Verify password sai" → match: false.
-(Nếu còn thời gian: phần "Cùng năm user, hai cách lưu trữ" cho thấy bảng SHA-256 không salt bị crack ngay bằng wordlist trong khi bcrypt chậm hơn hẳn.)
+1. Bước 01: bấm "Hash password" rồi "Hash lại lần nữa" → cùng password, hai chuỗi $2a$10$… khác nhau. Phần salt (tô xanh) khác nên phần hash cũng khác.
+2. Ô "Password để thử" mặc định là correct-horse-battery! → Verify → match: false. Xoá dấu "!" → Verify → match: true.
+3. Kéo xuống "Cùng năm user, hai cách lưu trữ" → "Mở bản dump bị lộ". Chỉ cột SHA-256: binh và chi có cùng hash vì cùng password, không có salt.
+4. "Crack offline với wordlist 25 từ" → SHA-256: 4/5 tài khoản bị crack trong chưa tới 1 ms. bcrypt cost 12: dừng ở giới hạn 3 giây, mới crack được 1/5.
+5. Dòng "Phóng to": với wordlist thật 14 triệu từ, SHA-256 mất khoảng nửa phút cho mọi tài khoản; bcrypt mất cỡ vài chục ngày cho mỗi tài khoản.
+6. Tài khoản em sống sót ở cả hai cột vì password không có trong wordlist → nối sang thẻ Online: nếu password đó đã lộ ở site khác, hash không cứu được.
 
-Lời kết: "Salt không phải secret. Mục tiêu là tránh việc password giống nhau luôn cho cùng một hash và tăng khả năng chống các phương pháp đoán password offline."
+Số trên demo khác số trên slide là bình thường: demo chạy trên CPU, một luồng Node, bcrypt cost 12; slide là GPU với cost 10. Điểm cần nhớ là khoảng cách hàng trăm nghìn đến hàng triệu lần, không phải con số chính xác.
 
-Phân biệt: brute-force/dictionary offline (sau khi lộ DB) → hash chậm + salt giúp. Credential stuffing online (dùng password lộ từ site khác) → hash không giúp; cần rate limit, phát hiện bất thường, MFA, kiểm tra password đã lộ.
+Lời kết demo: "Salt không phải secret. Mục tiêu là tránh việc password giống nhau luôn cho cùng một hash, và làm bảng tra sẵn (rainbow table) vô dụng."
+
+Quay lại slide, cột trái: trên một GPU RTX 4090, hashcat thử khoảng 22 tỷ SHA-256 mỗi giây, nhưng chỉ khoảng 5 nghìn bcrypt cost 10 mỗi giây — chậm hơn khoảng 4 triệu lần. Số bcrypt quy đổi từ benchmark cost 5 (mỗi bậc cost chậm gấp đôi), nên nói là "khoảng". Câu chốt: "Chậm là tính năng, không phải bug."
+
+Hai thẻ bên phải:
+- Offline: attacker có bản dump DB, đoán thoải mái trên máy riêng → salt + hash chậm có giúp.
+- Online / credential stuffing: attacker có danh sách email/password lộ từ site khác, thử login thẳng vào DevHub. Hash không liên quan vì password đúng là password thật → cần rate limit, MFA, chặn password đã lộ (ví dụ kiểm tra qua Have I Been Pwned).
 
 Lưu ý: lab chưa có rate limiting — nói rõ đây là giới hạn của demo.`,
   },
   {
-    n: 8, minutes: 3, time: '24–27', section: 'Session',
+    part: 3, minutes: 0.5, section: 'Session',
+    title: 'Session & cookie',
+    question: 'Cookie mang gì, và logout thực sự xoá cái gì?',
+    bullets: [],
+    notes: `Chuyển phần: "Phần 3 — sau khi login bằng password, server cấp cho browser một session ID. Từ đây credential không còn là password nữa mà là cookie."
+
+Phần này có hai demo: session/cookie và logout.`,
+  },
+  {
+    minutes: 3, section: 'Session',
     title: 'Session-based Authentication',
-    bullets: ['Server xác minh credential.', 'Server tạo session (trạng thái nằm ở server).', 'Browser giữ session ID qua cookie.', 'Server tra cứu session ở request tiếp theo.'],
+    bullets: [
+      'Cookie mang ID, không mang user.',
+      'Trạng thái phiên nằm ở session store.',
+      'Browser tự gửi cookie; server tra cứu.',
+      'Logout / đổi quyền có hiệu lực ngay.',
+    ],
     diagram: 'sessionFlow',
     notes: `Lời dẫn: "Cookie không nhất thiết chứa thông tin người dùng. Với session-based authentication, cookie thường mang một session identifier để server tra cứu trạng thái phiên."
 
@@ -167,51 +277,70 @@ Lưu ý: lab chưa có rate limiting — nói rõ đây là giới hạn của d
 Ưu điểm: server kiểm soát hoàn toàn (logout, force logout, đổi quyền có hiệu lực ngay), cookie nhỏ. Trade-off: cần session store dùng chung khi scale ngang; cookie gắn với domain; vì browser tự gửi cookie nên phải tính đến CSRF.`,
   },
   {
-    n: 9, minutes: 4, time: '27–33', section: 'Session',
+    minutes: 4, section: 'Session',
     title: 'Cookie là credential',
-    bullets: ['`HttpOnly` — JavaScript không đọc được.', '`Secure` — chỉ gửi qua HTTPS.', '`SameSite` — hạn chế gửi kèm request cross-site.', '`Path`, `Domain`, `Max-Age` — phạm vi và thời hạn.'],
+    bullets: [
+      'Cookie là credential: cầm ID là user đó.',
+      'Mỗi flag vá một lỗ; không flag nào vá hết.',
+      '`HttpOnly` không chặn XSS gọi API.',
+      '`Max-Age` hết hạn cookie, không revoke.',
+    ],
     diagram: 'cookieAnatomy',
     demo: 'session',
-    notes: `Demo 3 — Session và Cookie (khoảng 3 phút). Mở nút "Mở Session Demo ↗". Chuẩn bị sẵn DevTools → Application → Cookies.
+    notes: `Demo 3 — Session và Cookie (khoảng 3 phút). Mở nút "Mở Session Demo ↗".
 
 Kịch bản:
-1. Login (member@devhub.local).
-2. Quan sát Set-Cookie trong Inspector của lab hoặc tab Network.
-3. Gọi /api/me → 200.
-4. Mở DevTools, chỉ ra các flags của devhub.sid. Bấm "Đọc bằng document.cookie" → không thấy giá trị vì HttpOnly.
-(Tuỳ chọn: "Truy cập ẩn danh trước" rồi login để thấy ID được regenerate → chống session fixation.)
+1. Login member@devhub.local.
+2. Inspector của lab: response login có Set-Cookie: devhub.sid=…; HttpOnly; SameSite=Lax; Path=/; Max-Age=900. Không có Secure.
+3. "Kiểm tra có cookie" → GET /api/me → 200.
+4. Kéo xuống "Giải phẫu devhub.sid". Chỉ Secure = false (cam): lab chạy HTTP localhost, flag này cố ý tắt. Các flag còn lại xanh.
+5. "Đọc bằng document.cookie" → chuỗi rỗng; pill "devhub.sid được HttpOnly che".
+(Tuỳ chọn: "Truy cập ẩn danh trước" rồi login → bước 04, ID bị rotate. Replay / ghost để slide 13.)
 
-Lời dẫn: "Không có một bộ cookie flags đúng cho mọi môi trường. Cấu hình phải phù hợp với HTTPS, domain, frontend/backend deployment và cách ứng dụng sử dụng cookie."
+Lời dẫn: "Không có một bộ cookie flags đúng cho mọi môi trường. Cấu hình phải khớp HTTPS, domain, và cách frontend/backend được deploy."
 
-Lưu ý lab: chạy http localhost nên Secure tắt (bật bằng SESSION_COOKIE_SECURE=true hoặc NODE_ENV=production). Lab không hiển thị đầy đủ session ID.`,
+Lab không hiển thị đầy đủ session ID. Bật Secure bằng SESSION_COOKIE_SECURE=true hoặc NODE_ENV=production.`,
   },
   {
-    n: 10, minutes: 4, time: '33–38', section: 'Session',
-    title: 'Session lifecycle và fixation',
-    bullets: ['Login → create/regenerate → use → expire/revoke.', 'Regenerate session ID sau khi xác thực.', 'Logout cần invalidate session phía server.', 'Xoá cookie không nhất thiết revoke session.'],
+    minutes: 4, section: 'Session',
+    title: 'Xoá cookie ≠ thu hồi session',
+    bullets: [
+      'Cả hai cách logout đều cho browser 401.',
+      '401 ở browser ≠ session đã chết.',
+      'Replay ID cũ: store còn thì vẫn vào được.',
+      '`regenerate()` lúc login chống fixation.',
+    ],
     diagram: 'sessionLifecycle',
     demo: 'logout',
-    notes: `Liên hệ ticket 01 trên slide sự cố: "đã logout mà request vẫn chạy" — Demo này trả lời trực tiếp.
+    notes: `Bug kinh điển: "đã logout mà request vẫn chạy" — demo trả lời trực tiếp.
 
 Demo 4 — Logout và Revocation (khoảng 3 phút). Mở nút "Mở Logout Demo ↗".
 
-Trang có hai cột chạy song song:
-- Cột trái "Chỉ xoá cookie" (/lab/session/forget-cookie): server gửi cookie hết hạn nhưng giữ session trong store.
-- Cột phải "Huỷ session phía server" (/session/logout): req.session.destroy() rồi mới xoá cookie.
+Hai cột dùng chung một cookie trình duyệt. Chạy hết cột A (kể cả replay) rồi mới sang cột B. Nếu login cả hai cột trước khi xong cột A, regenerate() huỷ ID cột A — Reset rồi chạy lại.
 
-Kịch bản (mỗi cột):
-1. Login và gọi /api/me → 200.
-2. Logout.
-3. Gọi /api/me lần nữa từ browser → 401 ở cả hai cột.
-4. Bấm "Replay ID đã sao chép từ client khác": cột trái vẫn đăng nhập được (session còn sống), cột phải bị từ chối.
-5. Giải thích: cookie là thứ ở browser; session là thứ ở server. Logout thật phải làm vô hiệu trạng thái ở server.
+Cột A — Chỉ xoá cookie (POST /lab/session/forget-cookie):
+1. Login → 201. ID bị copy (rút gọn).
+2. GET /api/me → 200.
+3. Logout chỉ hết hạn cookie → 200.
+4. GET /api/me từ browser này → 401.
+5. Replay ID đã copy → vẫn member@devhub.local. Browser quên cookie; store còn session.
 
-Session fixation: attacker cài sẵn một session ID đã biết, chờ nạn nhân login. Cách sửa: regenerate ID khi login và khi đổi quyền (lab đã làm ở /session/login).`,
+Cột B — Huỷ session (POST /session/logout):
+Lặp bước 1–4. Logout trả 204. Replay → bị từ chối.
+
+Câu chốt: cookie là thứ ở browser; session là thứ ở server. Logout thật phải destroy store, rồi mới hết hạn cookie.
+
+Fixation (timeline trên slide): attacker cài sẵn một session ID, chờ nạn nhân login. Lab regenerate ID ở /session/login — đã xem ở Demo 3 bước 04.`,
   },
   {
-    n: 11, minutes: 4, time: '38–44', section: 'Session',
+    minutes: 4, section: 'Session',
     title: 'CSRF và XSS không giống nhau',
-    bullets: ['CSRF: browser gửi credential ngoài ý muốn.', 'XSS: script độc hại chạy trong origin ứng dụng.', '`HttpOnly` không ngăn mọi tác động của XSS.', '`SameSite` không thay thế toàn bộ CSRF protection.'],
+    bullets: [
+      'CSRF: cookie tự gửi, attacker không thấy.',
+      'XSS: script trong origin gọi API như user.',
+      '`HttpOnly` không chặn XSS gọi API.',
+      '`SameSite` ≠ CSRF token / Origin.',
+    ],
     diagram: 'csrfXss',
     notes: `Lời dẫn: "CSRF và XSS có thể cùng ảnh hưởng đến một ứng dụng dùng cookie, nhưng nguyên nhân và cách phòng vệ khác nhau. Không nên coi một cookie flag là giải pháp bảo mật toàn diện."
 
@@ -222,11 +351,25 @@ XSS (phải): script của attacker chạy trong chính origin DevHub. HttpOnly 
 Không demo khai thác — dùng sơ đồ để giữ nhịp.`,
   },
   {
-    n: 12, minutes: 3, time: '44–47', section: 'JWT',
+    part: 4, minutes: 0.5, section: 'JWT',
+    title: 'JWT & tokens',
+    question: 'Đọc được payload có nghĩa là tin được payload không?',
+    bullets: [],
+    notes: `Chuyển phần: "Phần 4 — thay vì giữ state ở server, nhiều hệ thống gửi cho client một token tự chứa claims. Câu hỏi: server dựa vào đâu để tin token đó?"
+
+Hai demo: JWT tampering và vòng đời access/refresh. Phần này kết thúc bằng bảng so sánh session và JWT.`,
+  },
+  {
+    minutes: 3, section: 'JWT',
     title: 'JWT: ba phần, ba ý nghĩa',
-    bullets: ['`header.payload.signature`', 'Payload chỉ được encode (Base64URL), ai cũng đọc được.', 'Decode không đồng nghĩa verify.', 'Signature giúp phát hiện token bị sửa — khi được kiểm tra đúng.'],
+    bullets: [
+      '`header.payload.signature`',
+      'Payload là Base64URL, không mã hoá.',
+      'Decode ≠ verify.',
+      'Chữ ký chỉ có giá trị khi server verify.',
+    ],
     diagram: 'jwtParts',
-    notes: `Liên hệ ticket 03: "JWT có role admin" — đọc được payload chưa chứng minh token hợp lệ.
+    notes: `Bug hay gặp: "mở JWT thấy role admin, vậy là admin" — đọc được payload chưa chứng minh token hợp lệ.
 
 Lời dẫn: "JWT không tự động bí mật chỉ vì có chữ ký. Nếu chỉ là signed JWT, payload vẫn có thể đọc được."
 
@@ -237,9 +380,10 @@ Hệ quả: không đặt dữ liệu nhạy cảm vào payload. Đọc được
 Liên hệ token-based flow: login → server ký token → client tự lưu và gửi qua header Authorization: Bearer <token> → server verify ở mỗi request mà không cần tra cứu session.`,
   },
   {
-    n: 13, minutes: 3, time: '47–50', section: 'JWT',
-    title: 'JWT claims cần validate',
-    bullets: ['`sub` — Subject: token nói về ai.', '`iss` — Issuer: ai phát hành.', '`aud` — Audience: token dành cho API nào.', '`exp` — Expiration.', '`nbf`, `iat`, `jti` — tuỳ use case.'],
+    minutes: 3, section: 'JWT',
+    title: 'Chữ ký đúng chưa đủ',
+    bullets: [],
+    takeaway: '`alg` nằm header, không phải claim. Chỉ nhận thuật toán trong allowlist.',
     diagram: 'claimsTable',
     notes: `Lời dẫn: "Chữ ký hợp lệ chưa chắc đã đủ. Token có thể được phát hành hợp lệ nhưng dành cho một API khác, vì vậy audience cũng phải được kiểm tra."
 
@@ -248,28 +392,44 @@ Trong lab: iss = devhub-auth-lab, aud = devhub-api, thuật toán chỉ cho phé
 jti dùng khi cần nhận diện/thu hồi từng token. iat cho biết thời điểm phát hành (ví dụ để từ chối token phát hành trước lần đổi password).`,
   },
   {
-    n: 14, minutes: 4, time: '50–56', section: 'JWT',
+    minutes: 4, section: 'JWT',
     title: 'Đừng tin payload chỉ vì đọc được',
-    bullets: ['Sửa payload không làm token trở nên hợp lệ.', 'Verify signature và claims.', 'Allowlist thuật toán.', 'Không chấp nhận `alg: none` cho token cần chữ ký.'],
+    bullets: [
+      'Sửa payload, giữ chữ ký cũ → `401`.',
+      '`alg: none` ngoài allowlist → `401`.',
+      'Member hợp lệ gọi `/api/admin` → `403`.',
+      'Decode ≠ verify; `401` ≠ `403`.',
+    ],
     diagram: 'jwtTamper',
     demo: 'jwt',
     notes: `Demo 5 — JWT Tampering (khoảng 4 phút). Mở nút "Mở JWT Demo ↗".
 
+Nhắc: alg = algorithm, nằm header, không phải claim.
+
+Dùng chip "Token lab chuẩn bị sẵn" cho nhanh. Đổi chip rồi phải bấm Verify lại. Verifier ngây thơ chỉ có khi lab bật chế độ vulnerable.
+
 Kịch bản:
-1. "Cấp token member" → decode: thấy email, role: member, iss, aud, exp.
-2. "Sửa payload" thành role: admin (token lab local, không phải token thật).
-3. Gửi token đã sửa tới /api/me và /api/admin → 401 cả hai (chữ ký không khớp).
-4. Cấp lại token member hợp lệ → /api/admin → 403 (đã xác thực, không đủ quyền).
-5. (Tuỳ chọn) So sánh "Verifier chặt" (jwt.verify + allowlist + claims) với "Verifier ngây thơ" (jwt.decode rồi tin luôn) trên fixture alg: none.
+1. "Cấp token member" (hoặc chip Hợp lệ) → header alg: HS256; payload role: member, iss, aud, exp.
+2. Chip "Sửa role" (hoặc "Sửa payload") → decode ra role: admin, chữ ký cũ giữ nguyên.
+3. Gửi tới /api/me và /api/admin → 401 cả hai, WWW-Authenticate: invalid_token.
+4. Chip Hợp lệ → /api/admin → 403 (AuthN pass, AuthZ fail). Role lấy từ bản ghi user phía server, không lấy từ payload.
+5. Chip "alg: none": Verifier chặt → 401. Verifier ngây thơ → 200 và cấp admin. Chuyển lại Chặt để chỉ bước nào bắt được.
 
-Lời kết: "Backend không được lấy role từ payload chưa được xác minh."
+Các chip còn lại (Hết hạn, Sai issuer, Sai audience, HS384, Chưa có hiệu lực) map từng dòng slide 17.
 
-Lưu ý: ô editor hiển thị token demo ngắn hạn do lab ký bằng secret local — không bao giờ dán token thật vào đây. Signing secret không bao giờ rời backend.`,
+Lời kết: "Backend không được lấy role từ payload chưa verify."
+
+Ô editor chỉ chứa token demo do lab ký. Không dán token thật. Signing secret không rời backend.`,
   },
   {
-    n: 15, minutes: 4, time: '56–61', section: 'JWT',
+    minutes: 4, section: 'JWT',
     title: 'Access token và refresh token',
-    bullets: ['Access token: gọi API, thời hạn ngắn.', 'Refresh token: chỉ dùng để xin token mới.', 'Rotation và revocation.', 'Token cũ quay lại → xử lý theo policy (thu hồi cả family).'],
+    bullets: [
+      'Access: JWT ngắn hạn, gửi Bearer tới API.',
+      'Refresh: opaque, chỉ `/tokens/refresh`.',
+      'Rotate: token mới, cái cũ = rotated.',
+      'Reuse RT cũ → `401`, thu hồi family.',
+    ],
     diagram: 'refreshRotation',
     demo: 'tokens',
     notes: `Demo 6 — Token Lifecycle (khoảng 4 phút). Mở nút "Mở Token Lifecycle Demo ↗". Trang ghi rõ: LUỒNG THẬT — rotation và phát hiện reuse chạy ở server, store in-memory, không dành cho production.
@@ -284,12 +444,15 @@ Kịch bản (các nút ① → ⑥):
 
 Bật "Access token ngắn hạn (20 giây)" nếu muốn xem access token hết hạn trong lúc nói.
 
-Điểm cần nhấn: access token đã phát hành vẫn hợp lệ đến exp kể cả sau logout — đó là lý do access token phải ngắn hạn. Refresh token lưu dạng hash (SHA-256) phía server, không lưu plaintext.`,
+Điểm cần nhấn: access token đã phát hành vẫn hợp lệ đến exp kể cả sau logout — đó là lý do access token phải ngắn hạn. Refresh token lưu dạng hash (SHA-256) phía server, không lưu plaintext.
+
+Opaque = chuỗi ngẫu nhiên, client không decode được. Khác JWT: JWT đọc được header/payload dù chưa verify chữ ký.`,
   },
   {
-    n: 16, minutes: 3, time: '61–64', section: 'Kiến trúc',
+    minutes: 3, section: 'JWT',
     title: 'Session hay JWT?',
-    bullets: ['Session: server kiểm soát lifecycle.', 'JWT: thuận tiện cho một số kiến trúc phân tán.', 'Revoke, scale và token storage có trade-off.', 'Không có lựa chọn tốt nhất cho mọi hệ thống.'],
+    bullets: [],
+    takeaway: 'Cần revoke ngay → session. Nhiều API / mobile → JWT.',
     diagram: 'compareTable',
     notes: `Câu hỏi tương tác: "Nếu DevHub là web app nội bộ với yêu cầu logout có hiệu lực rõ ràng, bạn sẽ chọn session hay JWT? Vì sao?"
 
@@ -297,18 +460,28 @@ Bật "Access token ngắn hạn (20 giây)" nếu muốn xem access token hết
 - State: session giữ trạng thái ở server; JWT tự chứa claims.
 - Revoke: session xoá là xong; JWT cần thời hạn ngắn + denylist/rotation.
 - Scale: session cần store dùng chung (Redis...); JWT verify được ở bất kỳ đâu có key.
-- Rủi ro browser: cookie → CSRF; token trong JS storage → lộ khi XSS.
 
-Không đưa đáp án tuyệt đối; hướng người nghe về yêu cầu và khả năng vận hành.`,
+Cột "JWT (stateless)" là access token: verify được mà không lookup session. Refresh opaque + rotation trong Demo 6 vẫn stateful — server lưu hash và phát hiện reuse. Hệ thống JWT thực tế thường lai: access ngắn hạn stateless, refresh có store.
+
+Không đưa đáp án tuyệt đối. Web nội bộ, logout tức thì → session. Nhiều API / mobile / phân tán → access JWT + refresh opaque.`,
   },
   {
-    n: 17, minutes: 3, time: '64–67', section: 'OAuth / OIDC / SAML',
+    part: 5, minutes: 0.5, section: 'OAuth / OIDC / SAML',
+    title: 'OAuth / OIDC / SAML',
+    question: '"Login with Google" thực ra là flow gì?',
+    bullets: [],
+    notes: `Chuyển phần: "Phần 5 — đến giờ DevHub tự giữ password. Khi doanh nghiệp đã có Identity Provider, DevHub giao việc xác thực cho IdP. Câu hỏi: flow đó chạy như thế nào và DevHub phải kiểm tra gì?"
+
+Demo 7 chạy live nếu đã cấu hình IdP, nếu không là walkthrough có nhãn.`,
+  },
+  {
+    minutes: 3, section: 'OAuth / OIDC / SAML',
     title: 'OAuth 2.0 không đồng nghĩa Login',
     bullets: [
-      'OAuth 2.0 = ủy quyền: cho app A gọi dữ liệu của bạn ở app B.',
-      'Ví dụ: DevHub đọc Google Calendar — không đưa mật khẩu Google.',
-      'Kết quả: access token để gọi API — không trả lời “ai vừa login”.',
-      'Muốn login chuẩn → OIDC (xây trên OAuth, slide sau).',
+      'App A gọi dữ liệu của bạn ở app B.',
+      'Đọc Calendar, không lấy password.',
+      'Access token gọi API, không nói ai login.',
+      'Muốn login chuẩn → OIDC (slide sau).',
     ],
     diagram: 'oauthRoles',
     notes: `Lời dẫn: "OAuth 2.0 là ủy quyền truy cập, không phải màn hình login. Người mới hay lẫn hai việc này."
@@ -328,13 +501,12 @@ Luồng rút gọn: Client xin ủy quyền → user đồng ý → Client đổ
 Chốt: access token của OAuth không nói cho client biết "ai vừa login" theo chuẩn. Việc đó thuộc OIDC.`,
   },
   {
-    n: 18, minutes: 3, time: '67–70', section: 'OAuth / OIDC / SAML',
+    minutes: 3, section: 'OAuth / OIDC / SAML',
     title: 'ID token ≠ Access token',
     bullets: [
-      'OIDC = OpenID Connect: lớp danh tính trên OAuth 2.0.',
-      'ID token: chứng minh AI đã login — dành cho client.',
-      'Access token: chứng minh được GỌI API nào — dành cho API.',
-      'Đừng gửi ID token tới API như Bearer token.',
+      'OIDC = danh tính trên OAuth 2.0.',
+      'ID token cho client; access token cho API.',
+      'Đừng gửi ID token làm Bearer.',
     ],
     diagram: 'idVsAccess',
     notes: `Định nghĩa khi mở slide: OIDC (OpenID Connect) xây trên OAuth 2.0 và thêm ID token để client biết user là ai — đây mới là “login qua IdP” theo chuẩn.
@@ -346,14 +518,10 @@ Access token: aud là API (resource server), chứa scope. API validate chữ k�
 Lỗi thường gặp: API chấp nhận ID token làm bearer token; client đọc access token để lấy thông tin user (access token có thể là opaque).`,
   },
   {
-    n: 19, minutes: 3, time: '70–73', section: 'OAuth / OIDC / SAML',
+    minutes: 3, section: 'OAuth / OIDC / SAML',
     title: 'Authorization Code Flow + PKCE',
-    bullets: [
-      '`state` — chống CSRF callback: “đây có đúng lần login tôi vừa bấm?”',
-      '`nonce` — gắn ID token với lần login này, chống replay token.',
-      '`code_verifier` / `code_challenge` (PKCE) — code bị đánh cắp cũng đổi token không được.',
-      '`redirect_uri` — chỉ nhận callback đúng URL đã đăng ký với IdP.',
-    ],
+    bullets: [],
+    takeaway: 'Verifier không lên URL. Cắp được code cũng không đổi token.',
     diagram: 'pkceFlow',
     notes: `Lời dẫn: giải thích từng param khi xuất hiện trên sơ đồ — đừng đọc như danh sách thuật ngữ.
 
@@ -379,13 +547,13 @@ Các bước (đi sơ đồ):
 6. Validate ID token: chữ ký, iss, aud, exp, nonce → tạo session DevHub.`,
   },
   {
-    n: 20, minutes: 4, time: '73–77', section: 'OAuth / OIDC / SAML',
+    minutes: 4, section: 'OAuth / OIDC / SAML',
     title: 'OIDC Demo — Login qua Identity Provider',
     bullets: [
-      'IdP = nơi user đăng nhập (Google, Okta…). DevHub không giữ mật khẩu đó.',
-      'Callback mang code + state về DevHub.',
-      'DevHub kiểm tra đủ rồi mới tin lần login.',
-      'DevHub tạo session riêng — không dùng token IdP để gọi API nội bộ.',
+      'IdP giữ password. DevHub không.',
+      'Callback mang `code` + `state`.',
+      'Đủ check mới tin login.',
+      'Session DevHub ≠ session IdP.',
     ],
     diagram: 'oidcLogin',
     demo: 'oidc',
@@ -408,15 +576,10 @@ Nếu banner là "FLOW WALKTHROUGH — NO REAL LOGIN" (chưa cấu hình, hoặc
 Ở walkthrough, không để người xem hiểu nhầm là đã login thật: request/response IdP trên trang là mẫu.`,
   },
   {
-    n: 21, minutes: 3, time: '77–80', section: 'OAuth / OIDC / SAML',
+    minutes: 3, section: 'OAuth / OIDC / SAML',
     title: 'SAML — Assertion XML vs ID token',
-    bullets: [
-      'Assertion = “giấy IdP xác nhận: user X đã login, dành cho app Y”.',
-      'Cùng việc với ID token của OIDC — khác “bao bì”: XML đã ký vs JWT.',
-      'SAML: browser POST XML về ACS. OIDC: đổi code lấy JWT.',
-      'Sau khi tin chứng từ → app tạo session riêng (giống nhau).',
-      'IdP đã cấu hình SAML → dùng SAML; app mới → ưu tiên OIDC.',
-    ],
+    bullets: [],
+    takeaway: 'IdP đã có SAML → dùng SAML. App mới → ưu tiên OIDC.',
     diagram: 'samlFlow',
     notes: `Lời dẫn — bắt đầu bằng Assertion, đừng nhảy thẳng vào acronym:
 
@@ -446,9 +609,24 @@ Rủi ro: verify sai phần tử XML (signature wrapping), sai Audience, hết h
 Câu hỏi (30 giây): khách bắt buộc SAML vì IdP chỉ có SAML — có nên ép OIDC? Thường không: compatibility quan trọng hơn preference.`,
   },
   {
-    n: 22, minutes: 3, time: '80–83', section: 'Kiến trúc',
-    title: 'Chọn kiến trúc theo threat model',
-    bullets: ['Client là browser, mobile hay service-to-service?', 'Có cần revoke tức thời không?', 'Có dùng SSO/IdP không?', 'Ai quản lý key, session store và token lifecycle?', 'XSS/CSRF được xử lý ra sao?'],
+    part: 6, minutes: 0.5, section: 'Lựa chọn',
+    title: 'Lựa chọn',
+    question: 'DevHub nên dùng session, JWT hay IdP?',
+    bullets: [],
+    notes: `Chuyển phần: "Phần 6 — đã có đủ các mảnh: password, session, JWT, OIDC. Giờ ghép lại: với yêu cầu cụ thể của DevHub, chọn phương án nào và review code auth theo checklist nào?"
+
+Phần này không có demo. Slide threat model là chỗ chọn phương án cho DevHub, rồi sang checklist review.`
+  },
+  {
+    minutes: 3, section: 'Lựa chọn',
+    title: 'Chọn theo threat model',
+    bullets: [
+      'Client: browser, mobile, hay service-to-service?',
+      'Cần revoke tức thời?',
+      'Có SSO/IdP?',
+      'Ai giữ key, session store, token lifecycle?',
+      'XSS/CSRF xử lý ra sao?',
+    ],
     diagram: 'threatQuestions',
     notes: `Tương tác: yêu cầu người nghe chọn session hoặc JWT cho DevHub và đưa ra ít nhất hai lý do (1 phút thảo luận theo cặp).
 
@@ -456,40 +634,14 @@ Gợi ý hướng phân tích:
 - Browser-only, cùng site → session cookie thường đơn giản và revoke tốt.
 - Mobile / nhiều API / service-to-service → access token ngắn hạn + refresh rotation, hoặc OIDC.
 - Có IdP doanh nghiệp → OIDC/SAML cho login, sau đó vẫn cần session hoặc token cho app.
-- Ai xoay key? Ai giám sát reuse? Log thế nào mà không lộ credential?`,
+- Ai xoay key? Ai giám sát reuse? Log thế nào mà không lộ credential?
+
+Chốt DevHub nếu khán giả hỏi: web nội bộ + logout tức thì → session; có IdP công ty → OIDC rồi session DevHub; JWT + refresh khi nhiều API / mobile.`,
   },
   {
-    n: 23, minutes: 2, time: '83–85', section: 'Kiến trúc',
-    title: 'Case study DevHub',
-    bullets: ['Web app nội bộ.', 'NestJS API.', 'Role `member` và `admin`.', 'Logout phải có hiệu lực.', 'Cần audit và vận hành rõ ràng.'],
-    diagram: 'caseStudy',
-    notes: `Câu hỏi: "Bạn sẽ lựa chọn kiến trúc nào? Trade-off nào quan trọng nhất?"
-
-Để bảng dấu ? trên slide. Cho khán giả thảo luận 1–2 phút (theo cặp hoặc cả phòng). Không đưa đáp án ngay.
-
-Khi thảo luận xong: click sang slide tiếp theo để hiện gợi ý đáp án.`,
-  },
-  {
-    n: 24, minutes: 1, time: '85–86', section: 'Kiến trúc',
-    title: 'Case study — gợi ý đáp án',
-    bullets: [
-      'Logout ngay → Session hoặc OIDC + session.',
-      'JWT + refresh: revoke phức tạp hơn.',
-      'Web app nội bộ NestJS → Session thường đủ.',
-      'Có IdP công ty → OIDC login, rồi session DevHub.',
-      'Không có đáp án tuyệt đối — phụ thuộc threat model.',
-    ],
-    diagram: 'caseStudyAnswers',
-    notes: `Đây là gợi ý sau thảo luận, không phải đáp án duy nhất.
-
-Hướng hợp lý cho DevHub: SSO qua OIDC với IdP công ty → DevHub tạo session server-side (cookie HttpOnly, Secure, SameSite) → authorization theo role ở mọi endpoint → logout huỷ session + (tuỳ chọn) RP-initiated logout ở IdP → audit log không chứa credential.
-
-Nhấn: bảng so sánh giúp chọn theo yêu cầu (logout, vận hành), không theo "cái nào hiện đại hơn".`,
-  },
-  {
-    n: 25, minutes: 2, time: '86–88', section: 'Tổng kết',
-    title: 'Authentication Review Checklist',
-    bullets: ['Password hashing và rate limiting.', 'Session/cookie lifecycle.', 'JWT signature và claims.', 'Access/refresh token lifecycle.', 'OIDC callback, state, nonce và PKCE.', 'Server-side authorization · Tests và logging an toàn.'],
+    minutes: 2, section: 'Tổng kết',
+    title: 'Checklist review Auth',
+    bullets: [],
     diagram: 'checklist',
     notes: `Lời dẫn: "Đây là checklist có thể áp dụng ngay khi review một PR authentication."
 
@@ -505,26 +657,53 @@ Câu hỏi khi review:
 Bản đầy đủ: docs/01-authentication-core.md, mục Security Checklist.`,
   },
   {
-    n: 26, minutes: 1, time: '88–89', section: 'Tổng kết',
-    title: 'Exit Ticket',
-    bullets: ['Member đã login nhưng gọi API admin thì thường nhận status code nào?', 'Decode JWT thành công có chứng minh token hợp lệ không?', 'Vì sao xoá cookie chưa chắc đã logout hoàn toàn?'],
-    diagram: 'exitTicket',
-    notes: `Cho khán giả khoảng 1 phút trả lời (giơ tay hoặc chat). Ba câu này quay lại đúng ba ticket mở đầu.
-
-Đáp án mong đợi:
-1. 403, nếu credential hợp lệ nhưng không đủ quyền.
-2. Không. Decode chỉ là đọc Base64URL; hợp lệ cần verify chữ ký và claims.
-3. Vì session hoặc refresh token phía server có thể còn hiệu lực (như cột "Chỉ xoá cookie" trong Demo 4).`,
-  },
-  {
-    n: 27, minutes: 1, time: '89–90', section: 'Tổng kết',
-    title: 'Secure login is a lifecycle, not a button.',
-    bullets: ['Verify đúng.', 'Store an toàn.', 'Gửi đúng cách.', 'Validate đủ.', 'Revoke có chủ đích.'],
+    minutes: 1, section: 'Tổng kết',
+    title: 'Login an toàn là vòng đời, không phải nút bấm.',
+    bullets: ['Verify đúng.', 'Store an toàn.', 'Send đúng cách.', 'Validate đủ.', 'Revoke khi cần.'],
     diagram: 'lifecycleRing',
     notes: `Lời kết: "Authentication không kết thúc ở thời điểm login thành công. Chúng ta phải kiểm soát toàn bộ vòng đời của credential."
 
-Quay lại câu mở đầu: ba ticket "bug login" thực ra nằm ở ba lớp khác nhau — giờ khán giả đã có khung để phân lớp trước khi vá.
+Đi năm box, mỗi cái một câu:
+- Verify: password so hash, không đọc lại plaintext; JWT/OIDC phải verify chữ ký, không tin decode.
+- Store: bcrypt + salt; session ở store; refresh opaque lưu hash. Không encrypt password, không log credential.
+- Send: cookie HttpOnly / SameSite; access gửi Bearer, không nhét URL. Browser tự gửi cookie → CSRF; XSS vẫn gọi API dù HttpOnly.
+- Validate: iss, aud, exp, alg allowlist; AuthZ ở server (401 vs 403). ID token không dùng làm Bearer cho API.
+- Revoke: destroy session, không chỉ hết hạn cookie; rotate refresh, reuse → huỷ family; access ngắn hạn vì vẫn sống đến exp; logout DevHub ≠ logout IdP.
 
-Tài liệu và lab: thư mục docs/ và devhub-auth-lab/ trong repository. Lab chỉ chạy local, dùng tài khoản giả lập.`,
+Một "bug login" có thể nằm ở bất kỳ bước nào trên — phân lớp rồi mới vá.
+
+Tài liệu và lab: docs/ và devhub-auth-lab/. Lab chỉ chạy local, tài khoản giả lập.`,
+  },
+  {
+    minutes: 0.5, section: 'Tổng kết',
+    title: 'Tổng kết',
+    bullets: [],
+    diagram: 'recap',
+    notes: `Đi nhanh 6 phần — mỗi ô một câu đã nói trong buổi. Không giảng lại.
+
+Rồi sang cảm ơn, rồi To be continued AuthZ.`,
+  },
+  {
+    minutes: 0.5, section: 'Tổng kết',
+    title: 'Cảm ơn',
+    bullets: [],
+    diagram: 'thanks',
+    notes: `Cảm ơn khán giả. Buổi 1 Authentication xong. Lab và docs dùng để ôn.`,
+  },
+  {
+    minutes: 0.5, section: 'Tổng kết',
+    title: 'To be continued',
+    bullets: [],
+    diagram: 'continued',
+    notes: `Buổi 2 Authorization — Nguyễn Ngọc Nhiên. AuthN: bạn là ai. AuthZ: bạn được làm gì. 401 vs 403 đã gặp ở đầu buổi; buổi sau đi sâu policy, role, resource.`,
   },
 ];
+
+const clock = (minutes) => `${String(Math.floor(minutes)).padStart(2, '0')}:${minutes % 1 ? '30' : '00'}`;
+
+let elapsed = 0;
+export const SLIDES = CONTENT.map((slide, index) => {
+  const start = elapsed;
+  elapsed += slide.minutes;
+  return { ...slide, n: index + 1, time: `${clock(start)}–${clock(elapsed)}` };
+});

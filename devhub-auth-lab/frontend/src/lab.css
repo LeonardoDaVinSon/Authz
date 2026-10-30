@@ -92,6 +92,7 @@
 .crack-card.good { border-color: #285447; }
 .crack-card .metric-row { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 12px 0 6px; }
 .crack-card.bad .metric-row strong { color: #ffabb8; }
+.crack-card .metric-row strong { font-size: clamp(15px, 1.5vw, 21px); overflow-wrap: anywhere; }
 .scale-row { display: grid; grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)); align-items: end; gap: 12px; margin-top: 14px; padding: 13px 15px; border: 1px dashed var(--line); border-radius: 10px; }
 .scale-row .panel-kicker { align-self: center; }
 .scale-row span { display: block; font-size: 10px; color: var(--muted); }

@@ -20,7 +20,7 @@ const STEPS: Step[] = [
   { from: 'client', to: 'idp', sample: (p) => `POST ${IDP}/token\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=authorization_code\n&code=SplxlOBeZQQYbYS6WxSbIA\n&redirect_uri=${encodeURIComponent(`${CLIENT}/callback`)}\n&client_id=devhub-web\n&code_verifier=${p.verifier}` },
   { from: 'idp', to: 'client', sample: () => `HTTP/1.1 200 OK\n{\n  "token_type": "Bearer",\n  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.<sample>.<sig>",\n  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.<sample>.<sig>",\n  "expires_in": 300\n}` },
   { from: 'client', to: 'client', sample: (p) => `verify(id_token, jwks_from("${IDP}/.well-known/jwks.json"))\nassert iss   === "${IDP}"\nassert aud   includes "devhub-web"\nassert exp   > now\nassert nonce === "${p.nonce}"\n// then create DevHub's own session` },
-  { from: 'client', to: 'api', sample: () => `GET /api/projects\nAuthorization: Bearer <access_token>\n// API checks: signature, iss, aud === "devhub-api", exp, scope` },
+  { from: 'client', to: 'api', sample: () => `Set-Cookie: devhub.sid=…; HttpOnly; SameSite=Lax\n\nGET /api/me\nCookie: devhub.sid=…\n// 200 — DevHub session, not the IdP access token` },
 ];
 
 const ID_TOKEN = { iss: IDP, sub: 'idp|8f2c', aud: 'devhub-web', exp: 1760000300, iat: 1760000000, nonce: '<nonce from step 1>', email: 'member@devhub.local', name: 'Mai Member' };

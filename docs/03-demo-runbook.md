@@ -90,7 +90,7 @@ Tuỳ chọn: phần "Cùng quy tắc · Bearer token" lặp lại với bốn n
 
 ### Demo 2 · Slide 7 · `/demo/password` — hash, salt, verify *(3 phút)*
 
-1. **Hash password** → hash #1. Chỉ ra `$2b$`, cost `10`, 22 ký tự salt.
+1. **Hash password** → hash #1. Chỉ ra `$2a$`, cost `10`, 22 ký tự salt.
 2. **Hash lại lần nữa** → hash #2 khác hash #1 ("✓ Hai chuỗi khác nhau…").
 3. **Verify** với password đúng → khớp + in hash. Đổi ô thử sang password sai → không khớp + vẫn in hash.
 4. (Nếu còn thời gian) ở bảng leak bên dưới, bấm **Crack offline với wordlist** — SHA-256 không salt rơi trong mili giây và lộ password dùng lại; bcrypt bị chặn bởi ngân sách thời gian.

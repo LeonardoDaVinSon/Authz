@@ -3,7 +3,7 @@ import { ApiResult, postJson } from '../api';
 import type { Translate } from '../i18n';
 import { messageOf } from '../ui';
 
-// bcrypt string: $2b$ + cost$ + 22-char salt + 31-char hash.
+// bcrypt string: $2a$ (bcryptjs) + cost$ + 22-char salt + 31-char hash.
 function HashParts({ hash }: { hash: string }) {
   return <div className="hash-parts">
     <span className="hp-alg">{hash.slice(0, 4)}</span><span className="hp-cost">{hash.slice(4, 7)}</span><span className="hp-salt">{hash.slice(7, 29)}</span><span className="hp-hash">{hash.slice(29)}</span>
@@ -50,7 +50,7 @@ export function PasswordVerifyPanel({ t }: { t: Translate }) {
         {error && <p className="hint warn-text">{error}</p>}
       </div>
       <div>
-        <div className="hash-legend"><span className="hp-alg">$2b$</span> {t('pwv.legendAlg')} <span className="hp-cost">10$</span> cost <span className="hp-salt">salt</span> {t('pwv.legendSalt')} <span className="hp-hash">hash</span></div>
+        <div className="hash-legend"><span className="hp-alg">$2a$</span> {t('pwv.legendAlg')} <span className="hp-cost">10$</span> cost <span className="hp-salt">salt</span> {t('pwv.legendSalt')} <span className="hp-hash">hash</span></div>
         <div className="hash-slot"><small>{t('pwv.hashN', { n: 1 })}</small>{first ? <HashParts hash={first} /> : <span className="hint">{t('pwv.empty')}</span>}</div>
         <div className="hash-slot"><small>{t('pwv.hashN', { n: 2 })}</small>{second ? <HashParts hash={second} /> : <span className="hint">{t('pwv.empty')}</span>}</div>
         {first && second && <div className={`verdict ${first !== second ? 'good' : 'bad'}`}>{first !== second ? t('pwv.different') : t('pwv.same')}</div>}

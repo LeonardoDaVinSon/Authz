@@ -3,12 +3,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
 import PptxGenJS from 'pptxgenjs';
-import { DECK, DEMO_LINKS, SLIDES } from './deck-content.mjs';
+import { DECK, DEMO_LINKS, PARTS, RECAP, SLIDES } from './deck-content.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const BASE_URL = (process.env.DEMO_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
-const OUT_PPTX = join(here, 'break-the-login.pptx');
+const OUT_PPTX = join(here, process.env.OUT_PPTX || 'break-the-login.pptx');
 const OUT_MD = join(root, 'docs', '02-slide-content.md');
 
 // ---------------------------------------------------------------------------
@@ -18,7 +18,8 @@ const knownRoutes = new Set([...routesSource.matchAll(/'(\/demo[^']*)'/g)].map((
 for (const [key, link] of Object.entries(DEMO_LINKS)) {
   if (!knownRoutes.has(link.route)) throw new Error(`Demo link "${key}" points to ${link.route}, which is not in frontend/src/routes.ts`);
 }
-if (SLIDES.length !== 27) throw new Error(`Expected 27 slides, found ${SLIDES.length}`);
+const partNumbers = SLIDES.filter((slide) => slide.part).map((slide) => slide.part);
+if (partNumbers.join() !== PARTS.map((_, index) => index + 1).join()) throw new Error(`Expected one intro slide per part in order, found parts ${partNumbers.join(', ')}`);
 
 // ---------------------------------------------------------------------------
 const C = {
@@ -151,32 +152,13 @@ function sequence(slide, region, actors, messages, opts = {}) {
 // ---------------------------------------------------------------------------
 // Diagrams. Each receives the slide and a region {x, y, w, h}.
 
-const FULL_WIDTH = new Set(['agenda', 'incidents', 'checklist', 'exitTicket']);
+const FULL_WIDTH = new Set(['agenda', 'hashVsEncrypt', 'claimsTable', 'compareTable', 'pkceFlow', 'samlFlow', 'checklist']);
 const TOTAL = SLIDES.length;
 
 const DIAGRAMS = {
-  architecture(slide, r) {
-    box(slide, 'Browser', r.x, r.y + 1.55, 1.7, 0.8, { size: 14, bold: true });
-    box(slide, 'DevHub API\nNestJS', r.x + 2.55, r.y + 1.45, 1.9, 1.0, { size: 14, bold: true, line: C.purple });
-    box(slide, 'Session Store', r.x + 5.25, r.y + 0.55, 1.7, 0.8, { size: 12, line: C.green });
-    box(slide, 'Identity Provider', r.x + 5.25, r.y + 2.55, 1.7, 0.8, { size: 12, line: C.orange });
-    arrow(slide, r.x + 1.7, r.y + 1.95, r.x + 2.55, r.y + 1.95, { color: C.purple, tail: 'triangle' });
-    arrow(slide, r.x + 4.45, r.y + 1.75, r.x + 5.25, r.y + 0.95, { color: C.green, tail: 'triangle' });
-    arrow(slide, r.x + 4.45, r.y + 2.15, r.x + 5.25, r.y + 2.95, { color: C.orange, tail: 'triangle' });
-    text(slide, 'credential', r.x + 1.62, r.y + 1.52, 1.0, 0.3, { size: 10, color: C.muted, align: 'center' });
-    text(slide, 'tạo · lưu · gửi · verify · thu hồi', r.x, r.y + 3.75, r.w, 0.4, { size: 13, color: C.muted, align: 'center', italic: true });
-  },
-
   agenda(slide) {
-    const items = [
-      ['01', 'AuthN ≠ AuthZ', '401 / 403 · quyền phía server', C.purple],
-      ['02', 'Password', 'Hash · salt · stuffing', C.orange],
-      ['03', 'Session & cookie', 'Lifecycle · logout · CSRF/XSS', C.green],
-      ['04', 'JWT & tokens', 'Decode ≠ verify · refresh', C.blue],
-      ['05', 'OAuth / OIDC', 'Code Flow + PKCE · SAML', C.purple],
-      ['06', 'Kiến trúc', 'Threat model · checklist', C.orange],
-    ];
-    items.forEach(([number, title, detail, color], index) => {
+    PARTS.forEach(({ no: number, title, detail, color: colorKey }, index) => {
+      const color = C[colorKey];
       const col = index % 3;
       const row = Math.floor(index / 3);
       const x = 0.6 + col * 4.1;
@@ -189,42 +171,35 @@ const DIAGRAMS = {
     });
   },
 
-  incidents(slide) {
-    text(slide, 'Backlog DevHub tuần này: ba ticket được gắn cùng một nhãn — bug login.', 0.6, 1.5, 12.1, 0.4, { size: 16, color: C.muted, italic: true });
-    const items = [
-      ['TICKET 01', '“Tôi đã logout rồi”', 'User bấm Logout, nhưng API vẫn nhận request của họ.', 'Lifecycle?\nAuthN?', C.orange],
-      ['TICKET 02', '“Member vào được admin”', 'Tài khoản member gọi được API chỉ dành cho admin.', 'AuthZ?\nBackend?', C.red],
-      ['TICKET 03', '“JWT có role: admin”', 'Mở payload ra thấy role admin — vậy là admin?', 'Decode?\nVerify?', C.purple],
-    ];
-    items.forEach(([ticket, title, body, question, color], index) => {
-      const x = 0.6 + index * 4.1;
-      const y = 2.05;
-      slide.addShape(pptx.ShapeType.roundRect, { x, y, w: 3.85, h: 3.55, rectRadius: 0.1, fill: { color: C.panel }, line: { color: C.line, width: 1 } });
-      slide.addShape(pptx.ShapeType.rect, { x, y, w: 3.85, h: 0.08, fill: { color }, line: { color, width: 0 } });
-      text(slide, ticket, x + 0.25, y + 0.2, 3.35, 0.3, { size: 11, color, bold: true, mono: true });
-      text(slide, title, x + 0.25, y + 0.55, 3.35, 0.55, { size: 17, bold: true, valign: 'top' });
-      text(slide, body, x + 0.25, y + 1.2, 3.35, 1.15, { size: 13.5, color: C.text, valign: 'top' });
-      box(slide, question, x + 0.25, y + 2.5, 3.35, 0.75, { size: 12, fill: C.panel2, color: C.muted, dash: true });
-    });
-    text(slide, 'Cùng triệu chứng — khác lớp nguyên nhân. Phân lớp trước khi vá nút Login.', 0.6, 5.8, 12.1, 0.4, { size: 15, color: C.muted, italic: true });
-  },
-
   authnAuthz(slide, r) {
-    const y = r.y + 1.0, bw = 1.4, bh = 1.0, gap = (r.w - bw * 4) / 3;
-    const xs = [0, 1, 2, 3].map((index) => r.x + index * (bw + gap));
-    box(slide, 'Request', xs[0], y, bw, bh, { size: 13, bold: true });
-    box(slide, 'AuthN\nWho are you?', xs[1], y, bw, bh, { size: 12, bold: true, line: C.purple });
-    box(slide, 'AuthZ\nWhat can you do?', xs[2], y, bw, bh, { size: 12, bold: true, line: C.blue });
-    box(slide, '200 OK', xs[3], y, bw, bh, { size: 15, bold: true, fill: C.greenDeep, line: C.green, color: C.green });
-    for (let index = 0; index < 3; index++) arrow(slide, xs[index] + bw, y + bh / 2, xs[index + 1], y + bh / 2, { color: C.purple });
-    text(slide, 'principal { id, role }', xs[1] + bw / 2 - 0.4, y - 0.45, bw + gap + 0.8, 0.35, { size: 10, color: C.muted, align: 'center', mono: true });
-    const outY = y + bh + 1.0;
-    box(slide, '401', xs[1] + 0.2, outY, bw - 0.4, 0.62, { size: 18, bold: true, fill: C.orangeDeep, line: C.orange, color: C.orange });
-    box(slide, '403', xs[2] + 0.2, outY, bw - 0.4, 0.62, { size: 18, bold: true, fill: C.redDeep, line: C.red, color: C.red });
-    arrow(slide, xs[1] + bw / 2, y + bh, xs[1] + bw / 2, outY, { color: C.orange });
-    arrow(slide, xs[2] + bw / 2, y + bh, xs[2] + bw / 2, outY, { color: C.red });
-    text(slide, 'credential thiếu / sai', xs[1] - 0.25, outY + 0.68, bw + 0.5, 0.35, { size: 10, color: C.muted, align: 'center' });
-    text(slide, 'đã biết là ai, không đủ quyền', xs[2] - 0.3, outY + 0.68, bw + 0.6, 0.35, { size: 10, color: C.muted, align: 'center' });
+    const widths = [2.0, 2.0, 1.55];
+    const gap = (r.w - widths.reduce((sum, w) => sum + w, 0)) / 2;
+    const xs = [r.x, r.x + widths[0] + gap, r.x + widths[0] + widths[1] + gap * 2];
+    const by = r.y + 1.35, bh = 0.95, midY = by + bh / 2;
+
+    box(slide, 'AuthN', xs[0], by, widths[0], bh, { size: 18, bold: true, line: C.purple, color: C.purple, lineWidth: 1.5 });
+    box(slide, 'AuthZ', xs[1], by, widths[1], bh, { size: 18, bold: true, line: C.blue, color: C.blue, lineWidth: 1.5 });
+    box(slide, 'Handler', xs[2], by, widths[2], bh, { size: 15, bold: true, line: C.green, color: C.green });
+    arrow(slide, xs[0] + widths[0], midY, xs[1], midY, { color: C.purple, width: 2 });
+    arrow(slide, xs[1] + widths[1], midY, xs[2], midY, { color: C.blue, width: 2 });
+
+    const chipW = 2.7, chipX = xs[0] + widths[0] + gap / 2 - chipW / 2;
+    box(slide, 'principal\n{ id: 42, role: member }', chipX, r.y + 0.15, chipW, 0.8, { size: 11, mono: true, line: C.purple, dash: true, fill: C.panel });
+    slide.addShape(pptx.ShapeType.line, { x: chipX + chipW / 2, y: r.y + 0.95, w: 0, h: midY - r.y - 0.95, line: { color: C.purple, width: 1, dashType: 'dash' } });
+
+    const captions = [
+      'Ai đang gọi?\ncookie · Bearer → principal',
+      'Được gọi endpoint này?\nprincipal + policy → allow/deny',
+      'Business logic',
+    ];
+    captions.forEach((caption, index) => text(slide, caption, xs[index] - 0.3, by + bh + 0.12, widths[index] + 0.6, 0.75, { size: 11.5, color: C.muted, align: 'center', valign: 'top' }));
+
+    const ey = r.y + 3.4;
+    slide.addShape(pptx.ShapeType.roundRect, { x: r.x, y: ey, w: r.w, h: 0.95, rectRadius: 0.08, fill: { color: C.panel }, line: { color: C.line, width: 1 } });
+    text(slide, 'VÍ DỤ', r.x + 0.2, ey + 0.08, 2, 0.25, { size: 9, bold: true, color: C.muted });
+    text(slide, '`member` → `GET /api/admin`', r.x + 0.2, ey + 0.35, 2.9, 0.45, { size: 13, codeColor: C.text });
+    box(slide, 'AuthN ✓', r.x + 3.25, ey + 0.2, 1.6, 0.55, { size: 14, bold: true, fill: C.greenDeep, line: C.green, color: C.green });
+    box(slide, 'AuthZ ✗', r.x + 5.05, ey + 0.2, 1.6, 0.55, { size: 14, bold: true, fill: C.redDeep, line: C.red, color: C.red });
   },
 
   decision401403(slide, r) {
@@ -241,66 +216,108 @@ const DIAGRAMS = {
     arrow(slide, cx, r.y + 2.35 + dh, cx, r.y + 3.9, { color: C.green });
     arrow(slide, cx + dw / 2, r.y + 0.85 + dh / 2, outX, r.y + 0.85 + dh / 2, { color: C.orange });
     arrow(slide, cx + dw / 2, r.y + 2.35 + dh / 2, outX, r.y + 2.35 + dh / 2, { color: C.red });
-    text(slide, 'không', cx + dw / 2, r.y + 1.05, 1.0, 0.3, { size: 10, color: C.orange, align: 'center' });
-    text(slide, 'không', cx + dw / 2, r.y + 2.55, 1.0, 0.3, { size: 10, color: C.red, align: 'center' });
-    text(slide, 'có', cx + 0.08, r.y + 1.98, 0.5, 0.3, { size: 10, color: C.green });
-    text(slide, 'có', cx + 0.08, r.y + 3.48, 0.5, 0.3, { size: 10, color: C.green });
+    text(slide, 'không', cx + dw / 2, r.y + 0.98, 1.0, 0.35, { size: 12, bold: true, color: C.orange, align: 'center' });
+    text(slide, 'không', cx + dw / 2, r.y + 2.48, 1.0, 0.35, { size: 12, bold: true, color: C.red, align: 'center' });
+    text(slide, 'có', cx + 0.1, r.y + 1.95, 0.6, 0.35, { size: 12, bold: true, color: C.green });
+    text(slide, 'có', cx + 0.1, r.y + 3.45, 0.6, 0.35, { size: 12, bold: true, color: C.green });
+  },
+
+  hashVsEncrypt(slide) {
+    const { header, rows, takeaway } = SLIDES.find((item) => item.diagram === 'hashVsEncrypt').compare;
+    const x = 0.6, w = 12.1, colW = [3.9, 4.1, 4.1], rowH = 0.68, top = 1.6;
+    const headColors = [C.muted, C.green, C.orange];
+    header.forEach((cell, index) => {
+      const cx = x + colW.slice(0, index).reduce((sum, v) => sum + v, 0);
+      text(slide, cell, cx + 0.2, top, colW[index] - 0.4, rowH, { size: 20, bold: true, color: headColors[index] });
+    });
+    rows.forEach((row, rowIndex) => {
+      const y = top + rowH * (rowIndex + 1);
+      slide.addShape(pptx.ShapeType.line, { x, y, w, h: 0, line: { color: C.line, width: 1 } });
+      row.forEach((cell, index) => {
+        const cx = x + colW.slice(0, index).reduce((sum, v) => sum + v, 0);
+        text(slide, cell, cx + 0.2, y, colW[index] - 0.4, rowH, { size: 18, bold: index === 0, color: index === 0 ? C.muted : C.text });
+      });
+    });
+    const bottom = top + rowH * (rows.length + 1);
+    slide.addShape(pptx.ShapeType.line, { x, y: bottom, w, h: 0, line: { color: C.line, width: 1 } });
+    box(slide, takeaway, x, bottom + 0.35, w, 0.75, { size: 18, bold: true, align: 'left', line: C.green, fill: C.greenDeep, color: C.text, margin: 12 });
   },
 
   passwordHash(slide, r) {
     text(slide, 'LƯU (lúc đăng ký / đổi password)', r.x, r.y, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
-    box(slide, 'password', r.x, r.y + 0.45, 1.5, 0.7, { size: 12, mono: true });
-    box(slide, 'bcrypt\ncost + salt ngẫu nhiên', r.x + 2.1, r.y + 0.4, 2.0, 0.8, { size: 11, bold: true, line: C.purple });
-    box(slide, '$2a$10$<salt><hash>', r.x + 4.7, r.y + 0.45, 2.25, 0.7, { size: 11, mono: true, line: C.green, color: C.green });
-    arrow(slide, r.x + 1.5, r.y + 0.8, r.x + 2.1, r.y + 0.8, { color: C.purple });
-    arrow(slide, r.x + 4.1, r.y + 0.8, r.x + 4.7, r.y + 0.8, { color: C.purple });
-    text(slide, 'DB chỉ giữ chuỗi này', r.x + 4.7, r.y + 1.2, 2.25, 0.3, { size: 9.5, color: C.muted, align: 'center' });
+    box(slide, 'password', r.x, r.y + 0.4, 1.5, 0.65, { size: 12, mono: true });
+    box(slide, 'bcrypt\ncost + salt ngẫu nhiên', r.x + 2.1, r.y + 0.35, 2.2, 0.75, { size: 11, bold: true, line: C.purple });
+    box(slide, 'DB lưu chuỗi hash', r.x + 4.9, r.y + 0.4, 1.95, 0.65, { size: 11.5, bold: true, line: C.green, color: C.green });
+    arrow(slide, r.x + 1.5, r.y + 0.72, r.x + 2.1, r.y + 0.72, { color: C.purple });
+    arrow(slide, r.x + 4.3, r.y + 0.72, r.x + 4.9, r.y + 0.72, { color: C.purple });
 
-    text(slide, 'VERIFY (lúc login)', r.x, r.y + 2.0, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
-    box(slide, 'password nhập', r.x, r.y + 2.45, 1.5, 0.7, { size: 11, mono: true });
-    box(slide, 'hash đã lưu', r.x, r.y + 3.35, 1.5, 0.7, { size: 11, mono: true, line: C.green });
-    box(slide, 'bcrypt.compare\nđọc salt + cost từ hash', r.x + 2.1, r.y + 2.8, 2.0, 0.9, { size: 11, bold: true, line: C.purple });
-    box(slide, 'match: true / false', r.x + 4.7, r.y + 2.9, 2.25, 0.7, { size: 12, mono: true });
-    arrow(slide, r.x + 1.5, r.y + 2.8, r.x + 2.1, r.y + 3.05, { color: C.purple });
-    arrow(slide, r.x + 1.5, r.y + 3.7, r.x + 2.1, r.y + 3.45, { color: C.green });
-    arrow(slide, r.x + 4.1, r.y + 3.25, r.x + 4.7, r.y + 3.25, { color: C.purple });
-    text(slide, 'Không có bước "giải mã" nào.', r.x, r.y + 4.25, r.w, 0.35, { size: 12, color: C.orange, italic: true, align: 'center' });
+    const segments = [
+      ['$2a$', 'thuật toán', 0.85, C.purple],
+      ['10$', 'cost', 0.7, C.orange],
+      ['g.Ku7scOETaTCAMBrp2kGu', 'salt (22 ký tự)', 2.65, C.green],
+      ['OIBoCCOZiwBFSmHS…', 'hash (31 ký tự)', 2.65, C.blue],
+    ];
+    let sx = r.x;
+    for (const [value, label, w, color] of segments) {
+      box(slide, value, sx, r.y + 1.3, w, 0.45, { size: 11, mono: true, color, line: color, fill: C.panel, radius: 0.02, margin: 2 });
+      text(slide, label, sx, r.y + 1.8, w, 0.3, { size: 10.5, color, align: 'center' });
+      sx += w;
+    }
+
+    text(slide, 'VERIFY (lúc login)', r.x, r.y + 2.35, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
+    box(slide, 'password nhập', r.x, r.y + 2.7, 1.5, 0.55, { size: 11, mono: true });
+    box(slide, 'hash đã lưu', r.x, r.y + 3.35, 1.5, 0.55, { size: 11, mono: true, line: C.green });
+    box(slide, 'bcrypt.compare\nđọc salt + cost từ hash', r.x + 2.1, r.y + 2.85, 2.2, 0.9, { size: 11, bold: true, line: C.purple });
+    box(slide, 'match:\ntrue / false', r.x + 4.9, r.y + 2.95, 1.95, 0.7, { size: 12, mono: true });
+    arrow(slide, r.x + 1.5, r.y + 2.97, r.x + 2.1, r.y + 3.1, { color: C.purple });
+    arrow(slide, r.x + 1.5, r.y + 3.62, r.x + 2.1, r.y + 3.5, { color: C.green });
+    arrow(slide, r.x + 4.3, r.y + 3.3, r.x + 4.9, r.y + 3.3, { color: C.purple });
+    text(slide, 'Không có bước "giải mã" nào.', r.x, r.y + 4.05, r.w, 0.45, { size: 16, bold: true, color: C.orange, align: 'center' });
   },
 
-  saltDefense(slide, r) {
-    text(slide, 'CÙNG PASSWORD, KHÁC HASH', r.x, r.y, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
-    box(slide, 'correct-horse-battery', r.x, r.y + 0.65, 2.0, 0.7, { size: 10.5, mono: true });
-    const hashRun = (salt, rest) => [
-      { text: '$2a$10$', options: { color: C.purple, fontFace: MONO } },
-      { text: salt, options: { color: C.ink, highlight: 'B6F0D8', fontFace: MONO } },
-      { text: rest, options: { color: C.text, fontFace: MONO } },
+  attackModes(slide, r) {
+    const half = (r.w - 0.25) / 2;
+    const cards = [
+      {
+        title: 'Offline — DB bị lộ', color: C.purple,
+        rows: [
+          ['ATTACKER CÓ', 'Bản dump DB, đoán trên máy riêng'],
+          ['SALT', 'Rainbow table vô dụng'],
+          ['HASH CHẬM', 'Mỗi lần đoán tốn kém'],
+        ],
+        verdict: 'Hash chậm: CÓ GIÚP', verdictColor: C.green, verdictFill: C.greenDeep,
+      },
+      {
+        title: 'Online — credential stuffing', color: C.orange,
+        rows: [
+          ['ATTACKER CÓ', 'Email / password lộ từ site khác'],
+          ['CÁCH LÀM', 'Thử login thẳng vào DevHub'],
+          ['CẦN', 'Rate limit · MFA · chặn pass đã lộ'],
+        ],
+        verdict: 'Hash chậm: KHÔNG GIÚP', verdictColor: C.red, verdictFill: C.redDeep,
+      },
     ];
-    box(slide, hashRun('FkqD0yEg8sfPXOaDf6yClO', 'iEYuAowt…'), r.x + 2.6, r.y + 0.35, 4.35, 0.55, { size: 10.5, align: 'left' });
-    box(slide, hashRun('GwdFYBs00xRxy3exlqlI5e', 'GIzhiFPP…'), r.x + 2.6, r.y + 1.1, 4.35, 0.55, { size: 10.5, align: 'left' });
-    arrow(slide, r.x + 2.0, r.y + 1.0, r.x + 2.6, r.y + 0.62, { color: C.purple });
-    arrow(slide, r.x + 2.0, r.y + 1.0, r.x + 2.6, r.y + 1.38, { color: C.purple });
-    text(slide, 'salt (22 ký tự, không bí mật)', r.x + 2.6, r.y + 1.7, 4.35, 0.3, { size: 9.5, color: C.green });
-
-    text(slide, 'MỖI LỚP CHẶN MỘT KIỂU TẤN CÔNG', r.x, r.y + 2.3, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
-    const half = (r.w - 0.2) / 2;
-    box(slide, [
-      { text: 'Offline — DB bị lộ\n', options: { bold: true, color: C.purple, fontSize: 12 } },
-      { text: 'Salt: không dùng được bảng tra sẵn\nHash chậm: mỗi lần đoán tốn kém', options: { color: C.text, fontSize: 11 } },
-    ], r.x, r.y + 2.7, half, 1.5, { align: 'left' });
-    box(slide, [
-      { text: 'Online — credential stuffing\n', options: { bold: true, color: C.orange, fontSize: 12 } },
-      { text: 'Hash không giúp được\nRate limit · monitoring · MFA', options: { color: C.text, fontSize: 11 } },
-    ], r.x + half + 0.2, r.y + 2.7, half, 1.5, { align: 'left', line: C.orange });
+    cards.forEach(({ title, color, rows, verdict, verdictColor, verdictFill }, index) => {
+      const x = r.x + index * (half + 0.25);
+      slide.addShape(pptx.ShapeType.roundRect, { x, y: r.y, w: half, h: r.h, rectRadius: 0.08, fill: { color: C.panel }, line: { color, width: 1.25 } });
+      text(slide, title, x + 0.2, r.y + 0.15, half - 0.4, 0.45, { size: 15, bold: true, color });
+      rows.forEach(([label, value], rowIndex) => {
+        const y = r.y + 0.75 + rowIndex * 0.95;
+        text(slide, label, x + 0.2, y, half - 0.4, 0.25, { size: 9.5, bold: true, color: C.muted });
+        text(slide, value, x + 0.2, y + 0.25, half - 0.4, 0.6, { size: 13, valign: 'top' });
+      });
+      box(slide, verdict, x + 0.2, r.y + r.h - 0.8, half - 0.4, 0.6, { size: 13, bold: true, fill: verdictFill, line: verdictColor, color: verdictColor });
+    });
   },
 
   sessionFlow(slide, r) {
     sequence(slide, r, ['Browser', 'DevHub API', 'Session Store'], [
-      { from: 0, to: 1, text: 'POST /login' },
+      { from: 0, to: 1, text: 'POST /session/login' },
       { from: 1, self: true, text: 'verify password' },
       { from: 1, to: 2, text: 'regenerate + lưu session' },
-      { from: 1, to: 0, text: 'Set-Cookie: sid=…', reply: true },
+      { from: 1, to: 0, text: 'Set-Cookie: devhub.sid=…', reply: true },
       { from: 0, to: 1, text: 'GET /api/me + Cookie' },
-      { from: 1, to: 2, text: 'tra cứu sid' },
+      { from: 1, to: 2, text: 'tra cứu session' },
       { from: 1, to: 0, text: '200 { user }', reply: true },
     ]);
   },
@@ -308,14 +325,15 @@ const DIAGRAMS = {
   cookieAnatomy(slide, r) {
     box(slide, [
       { text: 'Set-Cookie: ', options: { color: C.muted } },
-      { text: 'sid=…; ', options: { color: C.text } },
+      { text: 'devhub.sid=…; ', options: { color: C.text } },
       { text: 'HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=900', options: { color: C.green } },
-    ], r.x, r.y, r.w, 0.62, { size: 11.5, mono: true, align: 'left', fill: C.panel });
+    ], r.x, r.y, r.w, 0.5, { size: 10.5, mono: true, align: 'left', fill: C.panel });
+    text(slide, 'Mục tiêu production. Lab HTTP: Secure = false.', r.x, r.y + 0.52, r.w, 0.28, { size: 10, italic: true, color: C.muted });
     table(slide, ['Thuộc tính', 'Chống lại', 'Không chống được'], [
       ['`HttpOnly`', 'JavaScript đọc cookie', 'XSS gọi API thay user'],
       ['`Secure`', 'Lộ qua HTTP thường', 'Lộ ở log / máy user'],
       ['`SameSite=Lax`', 'Phần lớn request cross-site', 'Mọi kịch bản CSRF'],
-      ['`Path` / `Domain`', 'Gửi cookie ra ngoài phạm vi', '—'],
+      ['`Path` / `Domain`', 'Gửi cookie ra ngoài phạm vi', 'Cổng / app cùng host'],
       ['`Max-Age`', 'Session sống vô thời hạn', 'Revoke trước hạn'],
     ], r.x, r.y + 0.85, r.w, [1.75, 2.6, 2.6], { size: 11, rowH: 0.5 });
   },
@@ -332,12 +350,12 @@ const DIAGRAMS = {
     const column = (x, title, color, deep, lines) => {
       slide.addShape(pptx.ShapeType.roundRect, { x, y, w: half, h: 3.0, rectRadius: 0.08, fill: { color: C.panel }, line: { color, width: 1.25 } });
       text(slide, title, x + 0.2, y + 0.12, half - 0.4, 0.4, { size: 13, bold: true, color });
-      box(slide, 'Browser cookie', x + 0.2, y + 0.65, half - 0.4, 0.5, { size: 11, fill: C.panel2, line: C.line, color: C.muted });
+      box(slide, 'Cookie: đã hết hạn', x + 0.2, y + 0.65, half - 0.4, 0.5, { size: 11, fill: C.panel2, line: C.line, color: C.muted });
       box(slide, lines[0], x + 0.2, y + 1.3, half - 0.4, 0.55, { size: 11, fill: deep, line: color, color });
       text(slide, lines[1], x + 0.2, y + 1.95, half - 0.4, 0.95, { size: 11, color: C.text, valign: 'top' });
     };
-    column(r.x, 'Chỉ xoá cookie', C.red, C.redDeep, ['Session store: CÒN SỐNG', 'Browser trông như đã logout, nhưng bản sao session ID vẫn dùng được.']);
-    column(r.x + half + 0.25, 'Destroy session ở server', C.green, C.greenDeep, ['Session store: ĐÃ XOÁ', 'Mọi bản sao session ID đều vô giá trị → 401.']);
+    column(r.x, 'Chỉ xoá cookie', C.red, C.redDeep, ['Session store: CÒN SỐNG', 'Bản sao session ID vẫn dùng được.']);
+    column(r.x + half + 0.25, 'Huỷ session phía server', C.green, C.greenDeep, ['Session store: ĐÃ XOÁ', 'Mọi bản sao ID đều vô giá trị → 401.']);
   },
 
   csrfXss(slide, r) {
@@ -354,10 +372,10 @@ const DIAGRAMS = {
       });
       text(slide, defence, x + 0.2, r.y + r.h - 1.05, half - 0.4, 0.95, { size: 10, color: C.text, valign: 'top' });
     };
-    panel(r.x, 'CSRF', C.orange, ['evil.example', 'Browser (đang login DevHub)', 'DevHub API thực thi'],
-      ['form POST tự động', 'cookie tự gửi kèm'], 'Attacker không thấy cookie.\nPhòng vệ: SameSite, CSRF token, kiểm tra Origin.');
-    panel(r.x + half + 0.3, 'XSS', C.red, ['Script độc trong origin DevHub', 'fetch("/api/…") như user', 'DevHub API thực thi'],
-      ['chạy với quyền trang', 'cookie vẫn được gửi'], 'HttpOnly chỉ chặn đọc cookie.\nPhòng vệ: output encoding, CSP, sanitize.');
+    panel(r.x, 'CSRF', C.orange, ['evil.example', 'Browser (đã login)', 'DevHub API'],
+      ['form POST', 'cookie tự gửi'], 'Attacker không thấy cookie.\nPhòng vệ: SameSite, CSRF token, Origin.');
+    panel(r.x + half + 0.3, 'XSS', C.red, ['Script trong origin', 'fetch /api như user', 'DevHub API'],
+      ['quyền của trang', 'cookie vẫn gửi'], 'HttpOnly chỉ chặn đọc cookie.\nPhòng vệ: encoding, CSP, sanitize.');
   },
 
   jwtParts(slide, r) {
@@ -387,8 +405,9 @@ const DIAGRAMS = {
     });
   },
 
-  claimsTable(slide, r) {
-    table(slide, ['Claim', 'Server kiểm tra'], [
+  claimsTable(slide) {
+    const takeaway = SLIDES.find((item) => item.diagram === 'claimsTable').takeaway;
+    table(slide, ['Claim / header', 'Server kiểm tra'], [
       ['`sub`', 'User tồn tại, còn hoạt động'],
       ['`iss`', 'Đúng issuer mong đợi'],
       ['`aud`', 'Token dành cho chính API này'],
@@ -396,7 +415,8 @@ const DIAGRAMS = {
       ['`nbf` / `iat`', 'Đã có hiệu lực, phát hành hợp lý'],
       ['`jti`', 'ID để thu hồi / chống replay'],
       ['`alg` (header)', 'Nằm trong allowlist'],
-    ], r.x, r.y, r.w, [1.85, 5.0], { size: 12, rowH: 0.52 });
+    ], 0.6, 1.55, 12.1, [3.2, 8.9], { size: 16, rowH: 0.58 });
+    box(slide, takeaway, 0.6, 6.2, 12.1, 0.7, { size: 16, bold: true, align: 'left', line: C.orange, fill: C.orangeDeep, color: C.text, margin: 12 });
   },
 
   jwtTamper(slide, r) {
@@ -423,7 +443,7 @@ const DIAGRAMS = {
     ], r.x, r.y, half, 0.95);
     box(slide, [
       { text: 'Refresh token · opaque\n', options: { bold: true, color: C.green, fontSize: 12 } },
-      { text: 'chỉ gửi tới /tokens/refresh\nserver lưu SHA-256, không lưu bản gốc', options: { color: C.text, fontSize: 10.5 } },
+      { text: 'chỉ /tokens/refresh · server lưu hash', options: { color: C.text, fontSize: 10.5 } },
     ], r.x + half + 0.2, r.y, half, 0.95, { line: C.green });
 
     text(slide, 'ROTATION — MỖI LẦN REFRESH CẤP TOKEN MỚI', r.x, r.y + 1.25, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
@@ -438,26 +458,26 @@ const DIAGRAMS = {
     box(slide, 'Ai đó dùng lại RT1\n(đã rotate)', r.x, r.y + 3.15, 2.1, 0.85, { size: 11, line: C.red });
     arrow(slide, r.x + 2.1, r.y + 3.57, r.x + 2.7, r.y + 3.57, { color: C.red });
     box(slide, '401 + thu hồi cả family\n(RT1, RT2, RT3)', r.x + 2.7, r.y + 3.15, 2.6, 0.85, { size: 11.5, bold: true, fill: C.redDeep, line: C.red, color: C.red });
-    text(slide, 'Không biết bên nào là attacker → huỷ hết, buộc login lại.', r.x + 5.4, r.y + 3.1, r.w - 5.4, 0.95, { size: 10, color: C.muted, valign: 'middle' });
+    text(slide, 'Không phân biệt attacker → huỷ family, login lại.', r.x + 5.4, r.y + 3.1, r.w - 5.4, 0.95, { size: 11, color: C.muted, valign: 'middle' });
   },
 
-  compareTable(slide, r) {
+  compareTable(slide) {
+    const takeaway = SLIDES.find((item) => item.diagram === 'compareTable').takeaway;
     table(slide, ['Tiêu chí', 'Session (stateful)', 'JWT (stateless)'], [
-      ['Trạng thái', 'Ở server (session store)', 'Nằm trong token'],
+      ['Trạng thái', 'Ở server (session store)', 'Nằm trong access token'],
       ['Revoke', 'Xoá session — có hiệu lực ngay', 'Chờ exp, hoặc denylist / rotation'],
       ['Scale ngang', 'Cần store dùng chung', 'Verify ở bất kỳ đâu có key'],
-      ['Rủi ro browser', 'Cookie tự gửi → CSRF', 'Lưu trong JS → lộ khi XSS'],
       ['Kích thước', 'ID nhỏ', 'Lớn hơn, gửi kèm mỗi request'],
       ['Phù hợp', 'Web app cùng site', 'Nhiều API, mobile, phân tán'],
-    ], r.x, r.y, r.w, [1.6, 2.7, 2.65], { size: 11.5, rowH: 0.56 });
+    ], 0.6, 1.55, 12.1, [2.4, 4.85, 4.85], { size: 16, rowH: 0.68 });
+    box(slide, takeaway, 0.6, 6.2, 12.1, 0.7, { size: 16, bold: true, align: 'left', line: C.orange, fill: C.orangeDeep, color: C.text, margin: 12 });
   },
 
   oauthRoles(slide, r) {
-    text(slide, 'OAuth 2.0 = ủy quyền gọi API, không phải “màn hình login”', r.x, r.y, r.w, 0.3, { size: 11, color: C.muted, bold: true });
-    sequence(slide, { x: r.x, y: r.y + 0.35, w: r.w, h: r.h - 0.35 }, ['Resource Owner\n(user)', 'Client\n(DevHub)', 'Authorization\nServer', 'Resource\nServer (API)'], [
+    sequence(slide, { x: r.x, y: r.y, w: r.w, h: r.h }, ['Resource Owner\n(user)', 'Client\n(DevHub)', 'Authorization\nServer', 'Resource\nServer (API)'], [
       { from: 1, to: 0, text: 'xin ủy quyền' },
       { from: 0, to: 1, text: 'authorization grant', reply: true },
-      { from: 1, to: 2, text: 'grant + client credentials' },
+      { from: 1, to: 2, text: 'grant + credentials' },
       { from: 2, to: 1, text: 'access token', reply: true },
       { from: 1, to: 3, text: 'gọi API bằng access token' },
       { from: 3, to: 1, text: 'dữ liệu được phép', reply: true },
@@ -487,29 +507,30 @@ const DIAGRAMS = {
     card(r.x + 3.6, 'Access token — cho API', C.green, 'aud = API\nscope\n→ được GỌI API nào');
   },
 
-  pkceFlow(slide, r) {
-    sequence(slide, { x: r.x, y: r.y, w: r.w, h: 2.55 }, ['Browser', 'DevHub', 'IdP'], [
+  pkceFlow(slide) {
+    const takeaway = SLIDES.find((item) => item.diagram === 'pkceFlow').takeaway;
+    const x = 0.6, w = 12.1;
+    sequence(slide, { x, y: 1.45, w, h: 2.9 }, ['Browser', 'DevHub', 'IdP'], [
       { from: 1, self: true, wide: true, text: 'sinh verifier · challenge · state · nonce' },
       { from: 0, to: 2, text: '/authorize?challenge&state&nonce' },
       { from: 2, to: 0, text: 'callback?code&state', reply: true },
       { from: 1, to: 2, text: '/token: code + verifier' },
       { from: 2, to: 1, text: 'ID token + access token', reply: true },
-    ], { size: 9.5 });
-
-    text(slide, 'TỪNG PARAM DÙNG ĐỂ LÀM GÌ', r.x, r.y + 2.65, r.w, 0.25, { size: 10, color: C.muted, bold: true });
+    ], { size: 12 });
     const params = [
-      ['state', 'Khớp callback với lần bấm login này.\nChống CSRF trên redirect.', C.purple],
+      ['state', 'Khớp callback với lần bấm login.\nChống CSRF trên redirect.', C.purple],
       ['nonce', 'Phải có trong ID token.\nChống replay ID token.', C.blue],
-      ['PKCE', 'challenge lên URL; verifier giữ bí mật.\nCode bị cắp cũng đổi token không được.', C.green],
+      ['PKCE', 'challenge lên URL.\nverifier giữ bí mật.', C.green],
       ['redirect_uri', 'Chỉ nhận callback đúng URL\nđã đăng ký với IdP.', C.orange],
     ];
-    const pw = (r.w - 0.3) / 4;
+    const pw = (w - 0.3) / 4;
     params.forEach(([title, body, color], index) => {
       box(slide, [
-        { text: `${title}\n`, options: { bold: true, color, fontSize: 12 } },
-        { text: body, options: { color: C.text, fontSize: 10 } },
-      ], r.x + index * (pw + 0.1), r.y + 2.95, pw, 1.4, { align: 'left', line: color });
+        { text: `${title}\n`, options: { bold: true, color, fontSize: 14 } },
+        { text: body, options: { color: C.text, fontSize: 12 } },
+      ], x + index * (pw + 0.1), 4.5, pw, 1.45, { align: 'left', line: color });
     });
+    box(slide, takeaway, x, 6.15, w, 0.7, { size: 16, bold: true, align: 'left', line: C.orange, fill: C.orangeDeep, color: C.text, margin: 12 });
   },
 
   oidcLogin(slide, r) {
@@ -544,37 +565,37 @@ const DIAGRAMS = {
     ], r.x, r.y + 2.7, half, 1.1, { align: 'left', line: C.green });
     box(slide, [
       { text: 'Session ở IdP vẫn còn\n', options: { bold: true, color: C.orange, fontSize: 12 } },
-      { text: 'Lần login sau có thể không hỏi lại mật khẩu. Cần logout cả ở IdP.', options: { color: C.text, fontSize: 10.5 } },
+      { text: 'Login sau có thể không hỏi password. Cần logout cả IdP.', options: { color: C.text, fontSize: 10.5 } },
     ], r.x + half + 0.2, r.y + 2.7, half, 1.1, { align: 'left', line: C.orange });
   },
 
-  samlFlow(slide, r) {
+  samlFlow(slide) {
+    const takeaway = SLIDES.find((item) => item.diagram === 'samlFlow').takeaway;
+    const x = 0.6, w = 12.1;
     box(slide, [
-      { text: 'Assertion = giấy IdP xác nhận\n', options: { bold: true, color: C.green, fontSize: 12 } },
-      { text: '“User X đã login · dành cho app Y · còn hạn tới …”\nCùng việc với ID token — khác bao bì (XML vs JWT).', options: { color: C.text, fontSize: 11 } },
-    ], r.x, r.y, r.w, 0.95, { align: 'left', line: C.green });
-
-    const half = (r.w - 0.15) / 2;
+      { text: 'Assertion = giấy IdP xác nhận  ', options: { bold: true, color: C.green, fontSize: 14 } },
+      { text: '“User X đã login · dành cho app Y · còn hạn tới …” — cùng việc với ID token, khác bao bì (XML vs JWT).', options: { color: C.text, fontSize: 13 } },
+    ], x, 1.45, w, 0.75, { align: 'left', line: C.green });
+    const half = (w - 0.2) / 2;
     box(slide, [
-      { text: 'SAML Assertion\n', options: { bold: true, color: C.orange, fontSize: 12 } },
-      { text: 'Định dạng: XML + chữ ký\nMang: Subject, Audience, exp\nVề app: POST tới ACS\nAi đọc: SP (DevHub)', options: { color: C.text, fontSize: 10.5, fontFace: MONO } },
-    ], r.x, r.y + 1.1, half, 1.55, { align: 'left', line: C.orange });
+      { text: 'SAML Assertion\n', options: { bold: true, color: C.orange, fontSize: 14 } },
+      { text: 'Định dạng: XML + chữ ký\nMang: Subject, Audience, exp\nVề app: POST tới ACS\nAi đọc: SP (DevHub)', options: { color: C.text, fontSize: 13, fontFace: MONO } },
+    ], x, 2.35, half, 1.55, { align: 'left', line: C.orange });
     box(slide, [
-      { text: 'OIDC ID token\n', options: { bold: true, color: C.purple, fontSize: 12 } },
-      { text: 'Định dạng: JWT (JSON)\nMang: sub, aud, exp, nonce\nVề app: code → /token\nAi đọc: OIDC client', options: { color: C.text, fontSize: 10.5, fontFace: MONO } },
-    ], r.x + half + 0.15, r.y + 1.1, half, 1.55, { align: 'left', line: C.purple });
-
-    text(slide, 'SAU KHI TIN CHỨNG TỪ → CẢ HAI ĐỀU TẠO SESSION RIÊNG CỦA APP', r.x, r.y + 2.8, r.w, 0.28, { size: 10, color: C.muted, bold: true });
-
-    sequence(slide, { x: r.x, y: r.y + 3.1, w: r.w, h: 1.35 }, ['Browser', 'SP', 'IdP'], [
+      { text: 'OIDC ID token\n', options: { bold: true, color: C.purple, fontSize: 14 } },
+      { text: 'Định dạng: JWT (JSON)\nMang: sub, aud, exp, nonce\nVề app: code → /token\nAi đọc: OIDC client', options: { color: C.text, fontSize: 13, fontFace: MONO } },
+    ], x + half + 0.2, 2.35, half, 1.55, { align: 'left', line: C.purple });
+    text(slide, 'SAU KHI TIN CHỨNG TỪ → CẢ HAI ĐỀU TẠO SESSION RIÊNG CỦA APP', x, 4.05, w, 0.28, { size: 12, color: C.muted, bold: true });
+    sequence(slide, { x, y: 4.35, w, h: 1.65 }, ['Browser', 'SP', 'IdP'], [
       { from: 1, to: 2, text: 'AuthnRequest' },
       { from: 2, to: 0, text: 'Assertion (XML)', reply: true },
       { from: 0, to: 1, text: 'POST ACS → verify → session' },
-    ], { size: 9.5 });
+    ], { size: 12 });
+    box(slide, takeaway, x, 6.15, w, 0.7, { size: 16, bold: true, align: 'left', line: C.orange, fill: C.orangeDeep, color: C.text, margin: 12 });
   },
 
   threatQuestions(slide, r) {
-    text(slide, 'ĐIỂM KHỞI ĐẦU THƯỜNG GẶP — KHÔNG PHẢI ĐÁP ÁN', r.x, r.y, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
+    text(slide, 'GỢI Ý BAN ĐẦU — KHÔNG PHẢI ĐÁP ÁN', r.x, r.y, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
     const rows = [
       ['Browser, cùng site, cần logout ngay', 'Session server-side + cookie flags', C.green],
       ['SPA + nhiều API, mobile', 'Access token ngắn + refresh rotation', C.purple],
@@ -589,40 +610,14 @@ const DIAGRAMS = {
     });
   },
 
-  caseStudy(slide, r) {
-    text(slide, 'ĐIỀN CÙNG KHÁN GIẢ — click tiếp để hiện đáp án', r.x, r.y, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
-    table(slide, ['Yêu cầu DevHub', 'Session', 'JWT + refresh', 'OIDC + session'], [
-      ['Logout có hiệu lực', '?', '?', '?'],
-      ['Role member / admin', '?', '?', '?'],
-      ['Audit rõ ràng', '?', '?', '?'],
-      ['Vận hành đơn giản', '?', '?', '?'],
-      ['Web app nội bộ, NestJS', '?', '?', '?'],
-    ], r.x, r.y + 0.45, r.w, [2.35, 1.5, 1.55, 1.55], { size: 12, rowH: 0.62 });
-  },
-
-  caseStudyAnswers(slide, r) {
-    text(slide, 'GỢI Ý ĐÁP ÁN — không phải đáp án duy nhất', r.x, r.y, r.w, 0.3, { size: 10.5, color: C.muted, bold: true });
-    table(slide, ['Yêu cầu DevHub', 'Session', 'JWT + refresh', 'OIDC + session'], [
-      ['Logout có hiệu lực', '✓ ngay', '~ revoke / đợi exp', '✓ session app'],
-      ['Role member / admin', '✓', '✓', '✓'],
-      ['Audit rõ ràng', '✓', '✓', '✓'],
-      ['Vận hành đơn giản', '✓', '~ phức tạp hơn', '~ cần IdP'],
-      ['Web app nội bộ, NestJS', '✓ hợp', '~', '✓ nếu có IdP'],
-    ], r.x, r.y + 0.4, r.w, [2.35, 1.5, 1.55, 1.55], { size: 12, rowH: 0.52 });
-    box(slide, [
-      { text: 'Hướng thảo luận\n', options: { bold: true, color: C.green, fontSize: 12 } },
-      { text: 'DevHub nội bộ + logout phải có hiệu lực → Session (hoặc OIDC + session của DevHub). JWT + refresh hợp hơn khi nhiều API / mobile.', options: { color: C.text, fontSize: 11 } },
-    ], r.x, r.y + 3.35, r.w, 1.05, { align: 'left', line: C.green });
-  },
-
   checklist(slide) {
     const items = [
       ['Password', 'Hash chuyên dụng (bcrypt / Argon2id), cost hợp lý, rate limiting.'],
       ['Session & cookie', 'Regenerate khi login, destroy khi logout, flags theo môi trường.'],
-      ['JWT', 'Verify chữ ký, allowlist thuật toán, iss / aud / exp.'],
-      ['Access / refresh', 'Access ngắn hạn, refresh rotation, phát hiện reuse, lưu hash.'],
+      ['JWT', 'Verify chữ ký, allowlist, iss / aud / exp.'],
+      ['Access / refresh', 'Access ngắn hạn, rotate, reuse → thu hồi, lưu hash.'],
       ['OIDC callback', 'state, nonce, PKCE, redirect URI chính xác.'],
-      ['AuthZ · tests · logs', 'Kiểm quyền ở backend, test 401/403, log không chứa credential.'],
+      ['AuthZ · tests · logs', 'Quyền ở backend, test 401/403, log không chứa credential.'],
     ];
     items.forEach(([title, body], index) => {
       const col = index % 3, row = Math.floor(index / 3);
@@ -634,22 +629,48 @@ const DIAGRAMS = {
     });
   },
 
-  exitTicket(slide) {
-    const questions = SLIDES.find((item) => item.diagram === 'exitTicket')?.bullets || [];
-    questions.forEach((question, index) => {
-      const y = 1.7 + index * 1.45;
-      box(slide, String(index + 1), 0.6, y, 0.85, 1.2, { size: 26, bold: true, fill: C.panel2, line: C.purple, color: C.purple });
-      slide.addShape(pptx.ShapeType.roundRect, { x: 1.65, y, w: 11.05, h: 1.2, rectRadius: 0.08, fill: { color: C.panel }, line: { color: C.line, width: 1 } });
-      text(slide, question, 1.95, y, 10.5, 1.2, { size: 18, bold: true });
-    });
-    text(slide, 'Đáp án nằm trong speaker notes.', 0.6, 6.2, 12.1, 0.3, { size: 12, color: C.muted, italic: true });
-  },
-
   lifecycleRing() { /* drawn by the closing layout */ },
 };
 
 // ---------------------------------------------------------------------------
 // Slide layouts
+
+const STATUS_COLORS = {
+  200: [C.green, C.greenDeep],
+  401: [C.orange, C.orangeDeep],
+  403: [C.red, C.redDeep],
+};
+
+function casesTable(slide, { rows, takeaway }) {
+  const x = 0.6, w = 4.95, rowH = 0.6, statusW = 0.95;
+  text(slide, 'REQUEST', x, 1.6, 3, 0.3, { size: 10, bold: true, color: C.muted });
+  text(slide, 'STATUS', x + w - statusW, 1.6, statusW, 0.3, { size: 10, bold: true, color: C.muted, align: 'center' });
+  rows.forEach(([request, status], index) => {
+    const y = 1.95 + index * rowH;
+    const [color, deep] = STATUS_COLORS[status];
+    slide.addShape(pptx.ShapeType.line, { x, y: y + rowH, w, h: 0, line: { color: C.line, width: 0.75 } });
+    text(slide, request, x, y, w - statusW - 0.15, rowH, { size: 14, codeColor: C.purple });
+    box(slide, status, x + w - statusW, y + 0.1, statusW, rowH - 0.2, { size: 14, bold: true, mono: true, fill: deep, line: color, color, margin: 1 });
+  });
+  text(slide, takeaway, x, 1.95 + rows.length * rowH + 0.25, w, 0.85, { size: 15, bold: true, valign: 'top', codeColor: C.purple });
+}
+
+function speedBars(slide, { caption, rows, ratio, takeaway, source }) {
+  const x = 0.6, w = 4.95;
+  text(slide, caption, x, 1.6, w, 0.3, { size: 10.5, bold: true, color: C.muted });
+  rows.forEach(([label, value, share, colorKey], index) => {
+    const y = 2.05 + index * 1.0;
+    const color = C[colorKey];
+    text(slide, label, x, y, 2.4, 0.35, { size: 15, bold: true });
+    text(slide, value, x + 2.4, y, w - 2.4, 0.35, { size: 15, bold: true, color, align: 'right' });
+    slide.addShape(pptx.ShapeType.rect, { x, y: y + 0.45, w, h: 0.3, fill: { color: C.panel2 }, line: { color: C.line, width: 0.5 } });
+    slide.addShape(pptx.ShapeType.rect, { x, y: y + 0.45, w: Math.max(w * share, 0.05), h: 0.3, fill: { color }, line: { color, width: 0 } });
+  });
+  const after = 2.05 + rows.length * 1.0;
+  text(slide, ratio, x, after, w, 0.35, { size: 13, color: C.muted, italic: true });
+  text(slide, takeaway, x, after + 0.5, w, 0.5, { size: 20, bold: true });
+  text(slide, source, x, after + 1.15, w, 0.5, { size: 9.5, color: C.muted, valign: 'top' });
+}
 
 function frame(slide, data) {
   slide.background = { color: C.bg };
@@ -670,28 +691,61 @@ function demoButton(slide, key) {
 }
 
 function titleSlide(slide, data) {
+  const { session1, session2 } = DECK.series;
   slide.background = { color: C.bg };
   slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.18, h: 7.5, fill: { color: C.purpleDeep }, line: { color: C.purpleDeep, width: 0 } });
-  text(slide, 'AUTHENTICATION CORE', 0.8, 1.2, 6, 0.35, { size: 12, mono: true, color: C.green });
+  text(slide, 'DEVHUB · FULLSTACK TECHNICAL SHARING', 0.9, 1.55, 11.5, 0.35, { size: 12, mono: true, color: C.muted });
   text(slide, [
     { text: 'Break the ', options: { color: C.text } },
     { text: 'Login.', options: { color: C.purple } },
-  ], 0.8, 1.7, 6.2, 1.3, { size: 54, bold: true });
-  text(slide, DECK.subtitle, 0.8, 3.05, 6, 0.5, { size: 20, color: C.text });
-  text(slide, DECK.audience, 0.8, 3.6, 6, 0.4, { size: 14, color: C.muted });
-  DIAGRAMS.architecture(slide, { x: 6.1, y: 1.7, w: 6.95, h: 4.5 });
+  ], 0.9, 2.05, 11.5, 1.1, { size: 52, bold: true });
+  text(slide, 'Authentication Core — credential lifecycle', 0.9, 3.25, 11.5, 0.45, { size: 20, color: C.text });
+
+  // Buổi đang diễn: nhấn mạnh
+  slide.addShape(pptx.ShapeType.roundRect, {
+    x: 0.9, y: 4.15, w: 5.7, h: 1.55, rectRadius: 0.1,
+    fill: { color: C.panel }, line: { color: C.purple, width: 1.5 },
+  });
+  text(slide, session1.label, 1.15, 4.35, 5.2, 0.4, { size: 16, bold: true, color: C.purple });
+  text(slide, session1.speaker, 1.15, 4.85, 5.2, 0.55, { size: 22, bold: true, color: C.text });
+
+  // Buổi tiếp theo: nhẹ hơn
+  slide.addShape(pptx.ShapeType.roundRect, {
+    x: 6.85, y: 4.15, w: 5.5, h: 1.55, rectRadius: 0.1,
+    fill: { color: C.panel }, line: { color: C.line, width: 1 },
+  });
+  text(slide, session2.label, 7.1, 4.35, 5.0, 0.4, { size: 16, bold: true, color: C.muted });
+  text(slide, session2.speaker, 7.1, 4.85, 5.0, 0.55, { size: 20, bold: true, color: C.muted });
+}
+
+function partSlide(slide, data) {
+  const part = PARTS[data.part - 1];
+  const color = C[part.color];
+  slide.background = { color: C.bg };
+  slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.18, h: 7.5, fill: { color }, line: { color, width: 0 } });
+  text(slide, `PHẦN ${part.no} / ${String(PARTS.length).padStart(2, '0')}`, 0.9, 2.0, 6, 0.35, { size: 14, mono: true, bold: true, color });
+  text(slide, data.title, 0.9, 2.5, 11.5, 1.1, { size: 54, bold: true });
+  text(slide, data.question, 0.9, 3.7, 11.5, 0.6, { size: 22, italic: true, color: C.muted });
+  const segW = (W - 1.8 - 0.15 * (PARTS.length - 1)) / PARTS.length;
+  PARTS.forEach((item, index) => {
+    const x = 0.9 + index * (segW + 0.15);
+    const active = index === data.part - 1;
+    const segColor = active ? color : C.line;
+    slide.addShape(pptx.ShapeType.rect, { x, y: 6.55, w: segW, h: 0.07, fill: { color: segColor }, line: { color: segColor, width: 0 } });
+    text(slide, `${item.no} ${item.title}`, x, 6.68, segW, 0.3, { size: 9.5, color: active ? color : C.muted, bold: active });
+  });
 }
 
 function closingSlide(slide, data) {
   slide.background = { color: C.bg };
   slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.06, fill: { color: C.purpleDeep }, line: { color: C.purpleDeep, width: 0 } });
-  text(slide, `${data.section.toUpperCase()}  ·  SLIDE ${TOTAL}/${TOTAL}`, 0.6, 0.22, 7, 0.3, { size: 10, mono: true, color: C.muted });
+  text(slide, `${data.section.toUpperCase()}  ·  SLIDE ${data.n}/${TOTAL}`, 0.6, 0.22, 7, 0.3, { size: 10, mono: true, color: C.muted });
   text(slide, [
-    { text: 'Secure login is a ', options: { color: C.text } },
-    { text: 'lifecycle', options: { color: C.purple } },
-    { text: ', not a button.', options: { color: C.text } },
-  ], 0.6, 1.1, W - 1.2, 1.0, { size: 34, bold: true, align: 'center' });
-  const steps = [['Verify', 'đúng', C.purple], ['Store', 'an toàn', C.green], ['Gửi', 'đúng cách', C.blue], ['Validate', 'đủ', C.orange], ['Revoke', 'có chủ đích', C.red]];
+    { text: 'Login an toàn là ', options: { color: C.text } },
+    { text: 'vòng đời', options: { color: C.purple } },
+    { text: ', không phải nút bấm.', options: { color: C.text } },
+  ], 0.6, 1.1, W - 1.2, 1.0, { size: 32, bold: true, align: 'center' });
+  const steps = [['Verify', 'đúng', C.purple], ['Store', 'an toàn', C.green], ['Send', 'đúng cách', C.blue], ['Validate', 'đủ', C.orange], ['Revoke', 'khi cần', C.red]];
   const sw = 2.15, gap = (W - 1.2 - sw * steps.length) / (steps.length - 1);
   steps.forEach(([verb, rest, color], index) => {
     const x = 0.6 + index * (sw + gap);
@@ -704,15 +758,68 @@ function closingSlide(slide, data) {
   text(slide, 'Break the Login · Authentication Core', W - 4.6, 7.08, 4.0, 0.28, { size: 9, color: C.muted, align: 'right' });
 }
 
+function recapSlide(slide, data) {
+  slide.background = { color: C.bg };
+  slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.06, fill: { color: C.purpleDeep }, line: { color: C.purpleDeep, width: 0 } });
+  text(slide, `TỔNG KẾT  ·  SLIDE ${data.n}/${TOTAL}`, 0.6, 0.22, 7, 0.3, { size: 10, mono: true, color: C.muted });
+  text(slide, 'Tổng kết', 0.6, 0.55, 12, 0.7, { size: 32, bold: true });
+  PARTS.forEach(({ no: number, title, color: colorKey }, index) => {
+    const color = C[colorKey];
+    const col = index % 3;
+    const row = Math.floor(index / 3);
+    const x = 0.6 + col * 4.1;
+    const y = 1.5 + row * 2.5;
+    slide.addShape(pptx.ShapeType.roundRect, { x, y, w: 3.9, h: 2.25, rectRadius: 0.1, fill: { color: C.panel }, line: { color: C.line, width: 1 } });
+    slide.addShape(pptx.ShapeType.rect, { x, y, w: 3.9, h: 0.08, fill: { color }, line: { color, width: 0 } });
+    text(slide, number, x + 0.25, y + 0.25, 3.4, 0.3, { size: 12, color, bold: true, mono: true });
+    text(slide, title, x + 0.25, y + 0.65, 3.4, 0.45, { size: 18, bold: true, color: C.text });
+    text(slide, RECAP[index].line, x + 0.25, y + 1.25, 3.4, 0.7, { size: 14, color: C.muted, codeColor: C.green });
+  });
+  text(slide, 'Break the Login · Authentication Core', W - 4.6, 7.08, 4.0, 0.28, { size: 9, color: C.muted, align: 'right' });
+}
+
+function thanksSlide(slide, data) {
+  slide.background = { color: C.bg };
+  slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.18, h: 7.5, fill: { color: C.purpleDeep }, line: { color: C.purpleDeep, width: 0 } });
+  text(slide, `TỔNG KẾT  ·  SLIDE ${data.n}/${TOTAL}`, 0.9, 0.22, 7, 0.3, { size: 10, mono: true, color: C.muted });
+  text(slide, 'Cảm ơn.', 0.9, 2.9, 11.5, 1.2, { size: 60, bold: true });
+  text(slide, 'Break the Login · Authentication Core', W - 4.6, 7.08, 4.0, 0.28, { size: 9, color: C.muted, align: 'right' });
+}
+
+function continuedSlide(slide, data) {
+  const { session2 } = DECK.series;
+  slide.background = { color: C.bg };
+  slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.18, h: 7.5, fill: { color: C.purpleDeep }, line: { color: C.purpleDeep, width: 0 } });
+  text(slide, `TỔNG KẾT  ·  SLIDE ${data.n}/${TOTAL}`, 0.9, 0.22, 7, 0.3, { size: 10, mono: true, color: C.muted });
+  text(slide, 'To be continued', 0.9, 2.0, 11.5, 0.45, { size: 20, italic: true, color: C.muted });
+  text(slide, [
+    { text: 'Auth', options: { color: C.text } },
+    { text: 'Z', options: { color: C.purple } },
+  ], 0.9, 2.5, 11.5, 0.95, { size: 52, bold: true });
+  slide.addShape(pptx.ShapeType.roundRect, {
+    x: 0.9, y: 3.7, w: 6.6, h: 1.55, rectRadius: 0.1,
+    fill: { color: C.panel }, line: { color: C.purple, width: 1.5 },
+  });
+  text(slide, session2.label, 1.15, 3.9, 6.1, 0.4, { size: 16, bold: true, color: C.purple });
+  text(slide, session2.speaker, 1.15, 4.4, 6.1, 0.55, { size: 22, bold: true, color: C.text });
+  text(slide, 'Break the Login · Authentication Core', W - 4.6, 7.08, 4.0, 0.28, { size: 9, color: C.muted, align: 'right' });
+}
+
 for (const data of SLIDES) {
   const slide = pptx.addSlide();
   if (data.n === 1) titleSlide(slide, data);
-  else if (data.n === TOTAL) closingSlide(slide, data);
+  else if (data.part) partSlide(slide, data);
+  else if (data.diagram === 'lifecycleRing') closingSlide(slide, data);
+  else if (data.diagram === 'recap') recapSlide(slide, data);
+  else if (data.diagram === 'thanks') thanksSlide(slide, data);
+  else if (data.diagram === 'continued') continuedSlide(slide, data);
   else {
     frame(slide, data);
     if (FULL_WIDTH.has(data.diagram)) DIAGRAMS[data.diagram](slide);
     else {
-      bullets(slide, data.bullets, 0.6, 1.65, 4.95, 4.4, data.bullets.length > 4 ? 16 : 18);
+      if (data.cases) casesTable(slide, data.cases);
+      else if (data.speed) speedBars(slide, data.speed);
+      else bullets(slide, data.bullets, 0.6, 1.65, 4.95, 4.4, data.bullets.length > 4 ? 16 : 18);
       DIAGRAMS[data.diagram](slide, { x: 5.95, y: 1.6, w: 6.85, h: 4.5 });
     }
     if (data.demo) demoButton(slide, data.demo);
@@ -755,7 +862,9 @@ for (const data of SLIDES) {
   md.push(`## Slide ${data.n} — ${data.title}`, '');
   md.push(`*${data.section} · ${data.time} · ${data.minutes} phút*`, '');
   md.push('**Nội dung hiển thị**', '');
+  if (data.question) md.push(`*${data.question}*`, '');
   for (const bullet of data.bullets) md.push(`- ${bullet}`);
+  if (data.takeaway) md.push(`- ${data.takeaway}`);
   md.push('');
   if (data.demo) {
     const link = DEMO_LINKS[data.demo];

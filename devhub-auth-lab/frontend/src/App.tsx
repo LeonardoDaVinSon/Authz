@@ -17,13 +17,13 @@ type Fixture = { id: string; label: string; description: string; failsAt: string
 type InspectorEntry = { id: number; at: string; method: string; path: string; status: number; durationMs: number; cookie?: string; authorization?: string; setCookie: string[]; wwwAuthenticate?: string };
 
 const LAB_META: Record<Exclude<Tab, 'overview'>, { icon: string; tone: 'purple' | 'green' | 'orange'; slide: number; demo: number }> = {
-  authz: { icon: '⊘', tone: 'purple', slide: 4, demo: 1 },
-  password: { icon: '⟡', tone: 'orange', slide: 6, demo: 2 },
-  session: { icon: '◉', tone: 'purple', slide: 8, demo: 3 },
-  logout: { icon: '⏻', tone: 'orange', slide: 9, demo: 4 },
-  jwt: { icon: '⌘', tone: 'green', slide: 13, demo: 5 },
-  tokens: { icon: '⟳', tone: 'green', slide: 14, demo: 6 },
-  oidc: { icon: '⇆', tone: 'purple', slide: 19, demo: 7 },
+  authz: { icon: '⊘', tone: 'purple', slide: 5, demo: 1 },
+  password: { icon: '⟡', tone: 'orange', slide: 9, demo: 2 },
+  session: { icon: '◉', tone: 'purple', slide: 12, demo: 3 },
+  logout: { icon: '⏻', tone: 'orange', slide: 13, demo: 4 },
+  jwt: { icon: '⌘', tone: 'green', slide: 18, demo: 5 },
+  tokens: { icon: '⟳', tone: 'green', slide: 19, demo: 6 },
+  oidc: { icon: '⇆', tone: 'purple', slide: 25, demo: 7 },
 };
 
 type CookieRow = { name: string; value: string; state: 'good' | 'warn'; does: string; doesNot: string };
@@ -83,6 +83,7 @@ export default function App() {
   const [cost, setCost] = useState(10);
   const [hashResult, setHashResult] = useState<ApiResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hashing, setHashing] = useState(false);
   const [notice, setNotice] = useState('');
   const [verifierMode, setVerifierMode] = useState<VerifierMode>('strict');
   const [vulnerableModes, setVulnerableModes] = useState(true);
@@ -127,6 +128,11 @@ export default function App() {
   }
   useEffect(() => { if (tab === 'jwt' && fixtures.length === 0) loadFixtures(); }, [tab]);
   useEffect(() => { if (tab === 'session') inspectSession(); }, [tab, resetKey]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   const tokenParts = useMemo(() => {
     const parts = token.split('.');
@@ -225,9 +231,9 @@ export default function App() {
     setActiveFixture(null); resetVerification(); setNotice(t('jwt.notice.algNone'));
   }
   async function hashDemo() {
-    setBusy(true);
+    setBusy(true); setHashing(true);
     const result = await postJson('/password/hash-demo', { password: hashPassword, cost });
-    setHashResult(result); setBusy(false);
+    setHashResult(result); setBusy(false); setHashing(false);
   }
 
   async function loadLeak() {
@@ -329,7 +335,7 @@ export default function App() {
         {tab === 'password' && <>
           <section className="page-heading"><div><div className="eyebrow muted">{t('password.eyebrow')}</div><h1>{t('password.title1')} <span>{t('password.title2')}</span></h1><p>{t('password.lead')}</p></div><div className="heading-symbol orange">⟡</div></section>
           <PasswordVerifyPanel key={resetKey} t={t} />
-          <div className="two-column bench-grid"><section className="panel"><div className="panel-header"><div><span className="panel-kicker">{t('password.bench.kicker')}</span><h3>{t('password.bench.title')}</h3></div><span className="mini-badge">BCRYPT</span></div><label>{t('password.sample')}</label><input value={hashPassword} onChange={(e) => setHashPassword(e.target.value)} type="text" autoComplete="off"/><div className="range-heading"><label>{t('password.costFactor')}</label><strong>{cost}</strong></div><input className="range" type="range" min="4" max="16" value={cost} onChange={(e) => setCost(Number(e.target.value))}/><div className="range-labels"><span>4 · {t('password.faster')}</span><span>16 · {t('password.slower')}</span></div><button className="button primary full" disabled={busy || !hashPassword} onClick={hashDemo}>{busy ? t('password.hashing') : t('password.generate')} <span>→</span></button><p className="hint">{t('password.timingHint')}</p></section>
+          <div className="two-column bench-grid"><section className="panel"><div className="panel-header"><div><span className="panel-kicker">{t('password.bench.kicker')}</span><h3>{t('password.bench.title')}</h3></div><span className="mini-badge">BCRYPT</span></div><label>{t('password.sample')}</label><input value={hashPassword} onChange={(e) => setHashPassword(e.target.value)} type="text" autoComplete="off"/><div className="range-heading"><label>{t('password.costFactor')}</label><strong>{cost}</strong></div><input className="range" type="range" min="4" max="16" value={cost} onChange={(e) => setCost(Number(e.target.value))}/><div className="range-labels"><span>4 · {t('password.faster')}</span><span>16 · {t('password.slower')}</span></div><button className="button primary full" disabled={busy || !hashPassword} onClick={hashDemo}>{hashing ? t('password.hashing') : t('password.generate')} <span>→</span></button><p className="hint">{t('password.timingHint')}</p></section>
           <section className="panel"><div className="panel-header"><div><span className="panel-kicker">{t('password.result.kicker')}</span><h3>{t('password.result.title')}</h3></div>{hashResult && <Status result={hashResult} t={t}/>}</div>{hashResult ? <><div className="metric-row"><div><small>{t('password.costFactor')}</small><strong>{hashResult.body?.cost ?? '—'}</strong></div><div><small>{t('password.elapsed')}</small><strong>{hashResult.body?.elapsedMs ?? '—'}<em> ms</em></strong></div></div><div className="hash-value">{hashResult.body?.hash || messageOf(hashResult, t)}</div><p className="hint">{t('password.rerunHint')}</p></> : <div className="empty-result"><div className="empty-check">#</div><div><strong>{t('password.noHash')}</strong><p>{t('password.noHashHint')}</p></div></div>}</section></div>
           <section className="panel leak-panel"><div className="panel-header"><div><span className="panel-kicker">{t('leak.kicker')}</span><h3>{t('leak.title')}</h3></div><span className="mini-badge">{t('leak.badge')}</span></div>
             <p className="panel-description">{t('leak.desc')}</p>
